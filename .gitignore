@@ -1,0 +1,26 @@
+# Python environments and generated files
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Local companion data and generated audio
+*.db
+*.sqlite
+*.sqlite3
+companion/*.mp3
+companion/*.wav
+
+# PlatformIO build output
+.pio/
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mindcraft | Ambient AI Assistant & Controller</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #080c14;
+    }
+    .oled-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .oled-screen {
+      background-color: #03070d;
+      border: 3px solid #1e293b;
+      box-shadow: inset 0 0 20px rgba(0, 255, 200, 0.06), 0 10px 30px rgba(0,0,0,0.6);
+    }
+    .oled-pixel {
+      color: #79ffe1;
+      text-shadow: 0 0 6px rgba(121, 255, 225, 0.5);
+    }
+    .btn-control {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+    .btn-control:active {
+      transform: scale(0.95);
+    }
+    .pulse-ring {
+      animation: ringPulse 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+    }
+    @keyframes ringPulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.2; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .v-bar {
+      transition: height 0.08s ease;
+      width: 4px;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col">
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-400 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-cyan-500/20">
+        M
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-extrabold text-base tracking-wider text-white">MINDCRAFT</h1>
+          <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60">CONTROLLER</span>
+        </div>
+        <p class="text-xs text-slate-400">Ambient AI Assistant & Breadboard Hub</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-xs">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 shadow-sm">
+        <span id="conn-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="conn-text" class="font-medium text-slate-300">Connecting...</span>
+      </div>
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 shadow-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span class="font-medium text-slate-300">Gemini 3.5 Flash-Lite</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- LEFT PANEL: Device Simulation, AI Voice Mic & Buttons (5 cols) -->
+    <section class="lg:col-span-5 flex flex-col gap-5">
+      
+      <!-- Virtual OLED Screen Mirror -->
+      <div class="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-xl">
+        <div class="flex justify-between items-center mb-2.5">
+          <div class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-desktop text-cyan-400"></i> OLED Screen Mirror (128x64)
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50">SSD1306 Live</span>
+        </div>
+
+        <div class="oled-screen rounded-xl p-3 sm:p-4 min-h-[155px] flex flex-col justify-between oled-font">
+          <div class="flex justify-between text-[11px] text-slate-400 border-b border-slate-800/80 pb-1.5">
+            <span id="screen-app-title" class="font-bold text-cyan-300 uppercase tracking-wider">MINDCRAFT</span>
+            <span id="screen-wifi-icon"><i class="fa-solid fa-wifi text-emerald-400 text-xs"></i></span>
+          </div>
+
+          <div id="screen-content" class="my-auto py-2 oled-pixel text-xs sm:text-sm font-semibold space-y-1">
+            <div class="text-slate-400">Loading screen...</div>
+          </div>
+
+          <div class="flex justify-between text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
+            <span id="screen-footer-left">DOWN: Next</span>
+            <span id="screen-footer-right">SEL: Open</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI ASSISTANT CONTROLLER MIC CARD -->
+      <div class="bg-gradient-to-b from-slate-900/90 to-slate-900/50 border border-cyan-500/20 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+        <div class="absolute -top-12 -right-12 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="flex justify-between items-center mb-4">
+          <div class="text-xs uppercase tracking-wider font-bold text-cyan-400 flex items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-sm text-cyan-400"></i> Controller AI Assistant
+          </div>
+          <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input id="chk-laptop-audio" type="checkbox" class="accent-cyan-500 rounded cursor-pointer" />
+              <span>Mirror on laptop speaker</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Big Hero Mic Button -->
+        <div class="flex flex-col items-center justify-center py-2">
+          <div class="relative">
+            <!-- Pulsing outer ring when recording -->
+            <div id="mic-ring" class="hidden absolute -inset-3 rounded-full bg-rose-500/30 pulse-ring pointer-events-none"></div>
+            
+            <button id="btn-hero-mic" onclick="toggleMic()" class="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-600 to-emerald-500 hover:from-cyan-500 hover:to-emerald-400 active:scale-95 text-slate-950 flex flex-col items-center justify-center shadow-lg shadow-cyan-500/25 border-2 border-cyan-300/40 transition-all duration-200">
+              <i id="hero-mic-icon" class="fa-solid fa-microphone text-2xl text-white"></i>
+              <span id="hero-mic-timer" class="hidden text-[10px] font-mono font-bold text-white mt-0.5">0:00</span>
+            </button>
+          </div>
+
+          <div class="text-center mt-3">
+            <div id="hero-status-title" class="font-bold text-sm text-white flex items-center justify-center gap-2">
+              <span>Talk to AI Assistant</span>
+            </div>
+            <p id="hero-status-subtitle" class="text-xs text-slate-400 mt-0.5">Click mic or hold <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-cyan-400 border border-slate-700 font-mono">Spacebar</kbd> to talk</p>
+          </div>
+
+          <!-- Real-time Voice Waveform Visualizer -->
+          <div id="visualizer-container" class="hidden flex items-center justify-center gap-1.5 h-6 mt-3">
+            <div class="v-bar bg-rose-500 h-2"></div>
+            <div class="v-bar bg-rose-400 h-4"></div>
+            <div class="v-bar bg-rose-300 h-5"></div>
+            <div class="v-bar bg-rose-400 h-3"></div>
+            <div class="v-bar bg-rose-500 h-2"></div>
+          </div>
+
+          <!-- Cancel Button (shown while recording) -->
+          <button id="btn-cancel-recording" onclick="cancelMic()" class="hidden mt-3 px-3 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-rose-400 border border-rose-900/50 text-[11px] font-medium flex items-center gap-1.5">
+            <i class="fa-solid fa-xmark"></i> Cancel (Esc)
+          </button>
+        </div>
+
+        <!-- Latest AI Response Banner -->
+        <div id="ai-response-card" class="mt-4 pt-3.5 border-t border-slate-800/80 text-xs">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-slate-400 text-[11px]">Latest AI Response:</span>
+            <span id="ai-response-badge" class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800/50">READY</span>
+          </div>
+          <div id="ai-response-text" class="text-slate-300 italic bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/40">
+            "Say 'Add task review budget' or 'I went to the gym' to try it!"
+          </div>
+          <div class="flex justify-end mt-2">
+            <button id="btn-replay-audio" onclick="replayLastAudio()" class="hidden px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-[11px] font-medium flex items-center gap-1.5 border border-slate-700/60">
+              <i class="fa-solid fa-volume-high"></i> Replay Voice
+            </button>
+          </div>
+        </div>
+
+        <!-- Instant Text Input Prompt -->
+        <div class="mt-3 flex items-center gap-2">
+          <input id="prompt-input" type="text" placeholder="Or type e.g. 'Add high priority task: Deploy site'" class="flex-1 bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors" onkeydown="if(event.key==='Enter') sendTextPrompt()" />
+          <button onclick="sendTextPrompt()" class="bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs shadow-md transition-all">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+
+        <!-- Quick Prompts Chips -->
+        <div class="flex flex-wrap gap-1.5 mt-2.5">
+          <button onclick="quickPrompt('Add high priority task: Finish project pitch')" class="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-[10px] text-cyan-300 border border-slate-700/50">+ High Task</button>
+          <button onclick="quickPrompt('I went to the gym today')" class="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-[10px] text-amber-300 border border-slate-700/50">🔥 Gym Streak</button>
+          <button onclick="quickPrompt('Note: Remember to order 5V power supply')" class="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-[10px] text-emerald-300 border border-slate-700/50">📝 Note</button>
+          <button onclick="quickPrompt('What is quantum computing?')" class="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-[10px] text-purple-300 border border-slate-700/50">❓ Ask AI</button>
+        </div>
+      </div>
+
+      <!-- Virtual Physical Button Pad -->
+      <div class="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+        <div class="flex justify-between items-center mb-3">
+          <div class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-gamepad text-cyan-400"></i> ESP32 Menu Controls
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">W/S/Enter/Esc</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5 max-w-[260px] mx-auto py-1">
+          <!-- Row 1: UP -->
+          <div class="col-start-2">
+            <button onclick="sendAction('UP')" class="btn-control w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex flex-col items-center justify-center gap-0.5 shadow">
+              <i class="fa-solid fa-chevron-up text-sm"></i>
+              <span class="text-[9px] font-mono text-slate-400">UP</span>
+            </button>
+          </div>
+
+          <!-- Row 2: BACK, SELECT, DOWN -->
+          <div class="col-start-1">
+            <button onclick="sendAction('BACK')" class="btn-control w-full py-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 flex flex-col items-center justify-center gap-0.5 shadow">
+              <i class="fa-solid fa-arrow-left text-sm"></i>
+              <span class="text-[9px] font-mono">BACK</span>
+            </button>
+          </div>
+          <div class="col-start-2">
+            <button onclick="sendAction('SELECT')" class="btn-control w-full py-3 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/50 flex flex-col items-center justify-center gap-0.5 shadow font-bold">
+              <i class="fa-solid fa-check text-sm"></i>
+              <span class="text-[9px] font-mono">SELECT</span>
+            </button>
+          </div>
+          <div class="col-start-3">
+            <button onclick="sendAction('DOWN')" class="btn-control w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex flex-col items-center justify-center gap-0.5 shadow">
+              <i class="fa-solid fa-chevron-down text-sm"></i>
+              <span class="text-[9px] font-mono text-slate-400">DOWN</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Data Hub (Habits, Tasks, Voice Notes) (7 cols) -->
+    <section class="lg:col-span-7 flex flex-col gap-5">
+      
+      <!-- Habit Streaks -->
+      <div class="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+        <div class="flex justify-between items-center mb-3">
+          <div class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-fire text-amber-500"></i> Habit Streaks
+          </div>
+          <button onclick="loadHabits()" class="text-xs text-slate-400 hover:text-white transition-colors"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+        <div id="habits-list" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <!-- Dynamic cards -->
+          <div class="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-slate-300">Gym</div>
+              <div class="text-[10px] text-slate-400">Daily routine</div>
+            </div>
+            <div class="text-base font-black text-amber-400">🔥 0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks List -->
+      <div class="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+        <div class="flex justify-between items-center mb-3">
+          <div class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-cyan-400"></i> Active Tasks (Prioritized)
+          </div>
+          <span id="tasks-count" class="text-xs text-cyan-400 font-mono font-semibold">0 Tasks</span>
+        </div>
+        <div id="tasks-list" class="space-y-2 flex-1 overflow-y-auto max-h-[260px] pr-1">
+          <!-- Dynamic tasks -->
+        </div>
+      </div>
+
+      <!-- Voice Notes -->
+      <div class="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+        <div class="flex justify-between items-center mb-3">
+          <div class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-note-sticky text-emerald-400"></i> Captured Voice Notes
+          </div>
+          <button onclick="loadNotes()" class="text-xs text-slate-400 hover:text-white transition-colors"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+        <div id="notes-list" class="space-y-2 max-h-[190px] overflow-y-auto pr-1">
+          <!-- Dynamic notes -->
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    let ws;
+    let mediaRecorder = null;
+    let audioStream = null;
+    let audioChunks = [];
+    let isRecording = false;
+    let recordTimerInterval = null;
+    let recordSeconds = 0;
+    let audioCtx = null;
+    let analyserNode = null;
+    let animFrame = null;
+    let spaceKeyDown = false;
+
+    // --- WebSocket Connection ---
+    function connectWS() {
+      const loc = window.location;
+      const wsUri = (loc.protocol === "https:" ? "wss://" : "ws://") + loc.host + "/ws/controller";
+      ws = new WebSocket(wsUri);
+
+      ws.onopen = () => {
+        document.getElementById("conn-dot").className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+        document.getElementById("conn-text").innerText = "Companion Connected";
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "screen_update") {
+            updateScreen(msg.screen);
+          } else if (msg.type === "data_refresh") {
+            refreshAll();
+          }
+        } catch (e) {
+          console.error("WS Parse error", e);
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById("conn-dot").className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+        document.getElementById("conn-text").innerText = "Reconnecting...";
+        setTimeout(connectWS, 2000);
+      };
+    }
+
+    function sendAction(action) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "button", button: action }));
+      }
+    }
+
+    function updateScreen(screen) {
+      if (!screen) return;
+      document.getElementById("screen-app-title").innerText = screen.title || "MINDCRAFT";
+      document.getElementById("screen-content").innerHTML = screen.html || "";
+      document.getElementById("screen-footer-left").innerText = screen.footer_left || "";
+      document.getElementById("screen-footer-right").innerText = screen.footer_right || "";
+    }
+
+    // --- Audio Visualizer & Level Meter ---
+    function setupVisualizer(stream) {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 64;
+        source.connect(analyserNode);
+
+        const bars = document.querySelectorAll(".v-bar");
+        const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+
+        function draw() {
+          if (!isRecording) return;
+          analyserNode.getByteFrequencyData(dataArray);
+          for (let i = 0; i < bars.length; i++) {
+            const val = dataArray[i * 2 + 1] || 0;
+            const h = Math.max(4, Math.min(24, Math.floor((val / 255) * 26)));
+            bars[i].style.height = `${h}px`;
+          }
+          animFrame = requestAnimationFrame(draw);
+        }
+        draw();
+      } catch (e) {
+        console.warn("Visualizer init error", e);
+      }
+    }
+
+    // --- Controller Microphone Management ---
+    async function startRecording() {
+      if (isRecording) return;
+      try {
+        audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        const options = { mimeType: 'audio/webm' };
+        if (!MediaRecorder.isTypeSupported('audio/webm')) {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            options.mimeType = 'audio/webm;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            options.mimeType = 'audio/mp4';
+          }
+        }
+
+        mediaRecorder = new MediaRecorder(audioStream, options);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunks.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          if (recordSeconds >= 0.5 && audioChunks.length > 0) {
+            await handleRecordedAudio();
+          } else {
+            resetMicUI();
+          }
+        };
+
+        mediaRecorder.start(100); // 100ms timeslices
+        isRecording = true;
+
+        // Notify server that assistant is listening (updates ESP32 OLED)
+        fetch("/api/ai/listening", { method: "POST" }).catch(() => {});
+
+        // Update UI to recording state
+        setMicUIRecording();
+        setupVisualizer(audioStream);
+
+      } catch (err) {
+        console.error("Microphone access error:", err);
+        alert("Could not access controller microphone. Please ensure microphone permissions are granted in your browser.");
+        resetMicUI();
+      }
+    }
+
+    function stopRecording() {
+      if (!isRecording || !mediaRecorder) return;
+      isRecording = false;
+      setMicUIThinking();
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+      if (audioStream) {
+        audioStream.getTracks().forEach(t => t.stop());
+        audioStream = null;
+      }
+    }
+
+    function cancelMic() {
+      if (!isRecording) return;
+      isRecording = false;
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.ondataavailable = null;
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+      }
+      if (audioStream) {
+        audioStream.getTracks().forEach(t => t.stop());
+        audioStream = null;
+      }
+      fetch("/api/ai/cancel", { method: "POST" }).catch(() => {});
+      resetMicUI();
+    }
+
+    function toggleMic() {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    }
+
+    function setMicUIRecording() {
+      recordSeconds = 0;
+      const btn = document.getElementById("btn-hero-mic");
+      btn.className = "relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-rose-600 to-red-500 active:scale-95 text-white flex flex-col items-center justify-center shadow-lg shadow-rose-600/40 border-2 border-rose-300 transition-all duration-200";
+      
+      document.getElementById("mic-ring").classList.remove("hidden");
+      document.getElementById("hero-mic-icon").className = "fa-solid fa-microphone-lines text-xl text-white animate-pulse";
+      document.getElementById("hero-mic-timer").classList.remove("hidden");
+      document.getElementById("hero-mic-timer").innerText = "0:00";
+      
+      document.getElementById("hero-status-title").innerHTML = `<span class="text-rose-400 font-bold flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> LISTENING TO YOU...</span>`;
+      document.getElementById("hero-status-subtitle").innerText = "Click to finish or release Spacebar";
+      document.getElementById("visualizer-container").classList.remove("hidden");
+      document.getElementById("btn-cancel-recording").classList.remove("hidden");
+
+      clearInterval(recordTimerInterval);
+      recordTimerInterval = setInterval(() => {
+        recordSeconds++;
+        const mins = Math.floor(recordSeconds / 60);
+        const secs = recordSeconds % 60;
+        document.getElementById("hero-mic-timer").innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      }, 1000);
+    }
+
+    function setMicUIThinking() {
+      clearInterval(recordTimerInterval);
+      const btn = document.getElementById("btn-hero-mic");
+      btn.className = "relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-700 to-indigo-700 text-white flex flex-col items-center justify-center shadow-lg shadow-cyan-600/30 border-2 border-cyan-400 transition-all duration-200";
+      
+      document.getElementById("mic-ring").classList.add("hidden");
+      document.getElementById("hero-mic-icon").className = "fa-solid fa-brain text-2xl text-cyan-200 animate-bounce";
+      document.getElementById("hero-mic-timer").classList.add("hidden");
+      
+      document.getElementById("hero-status-title").innerHTML = `<span class="text-cyan-300 font-bold">GEMINI 3.5 THINKING...</span>`;
+      document.getElementById("hero-status-subtitle").innerText = "Classifying speech & generating voice audio";
+      document.getElementById("visualizer-container").classList.add("hidden");
+      document.getElementById("btn-cancel-recording").classList.add("hidden");
+    }
+
+    function resetMicUI() {
+      clearInterval(recordTimerInterval);
+      const btn = document.getElementById("btn-hero-mic");
+      btn.className = "relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-600 to-emerald-500 hover:from-cyan-500 hover:to-emerald-400 active:scale-95 text-slate-950 flex flex-col items-center justify-center shadow-lg shadow-cyan-500/25 border-2 border-cyan-300/40 transition-all duration-200";
+      
+      document.getElementById("mic-ring").classList.add("hidden");
+      document.getElementById("hero-mic-icon").className = "fa-solid fa-microphone text-2xl text-white";
+      document.getElementById("hero-mic-timer").classList.add("hidden");
+      
+      document.getElementById("hero-status-title").innerHTML = `<span>Talk to AI Assistant</span>`;
+      document.getElementById("hero-status-subtitle").innerHTML = `Click mic or hold <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-cyan-400 border border-slate-700 font-mono">Spacebar</kbd> to talk`;
+      document.getElementById("visualizer-container").classList.add("hidden");
+      document.getElementById("btn-cancel-recording").classList.add("hidden");
+    }
+
+    async function handleRecordedAudio() {
+      const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
+      const audioBlob = new Blob(audioChunks, { type: mimeType });
+      const formData = new FormData();
+      formData.append("file", audioBlob, "speech.webm");
+
+      try {
+        const response = await fetch("/api/process_audio", {
+          method: "POST",
+          body: formData
+        });
+        const result = await response.json();
+        handleAIResult(result);
+      } catch (err) {
+        console.error("Audio upload error:", err);
+      } finally {
+        resetMicUI();
+        refreshAll();
+      }
+    }
+
+    function handleAIResult(result) {
+      if (!result) return;
+      const action = result.action || "CONVERSATION";
+      const spoken = result.spoken_response || "";
+      
+      const badge = document.getElementById("ai-response-badge");
+      badge.innerText = action;
+      if (action === "TASK") badge.className = "px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800/60";
+      else if (action === "HABIT") badge.className = "px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800/60";
+      else if (action === "NOTE") badge.className = "px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60";
+      else badge.className = "px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-purple-950 text-purple-400 border border-purple-800/60";
+
+      document.getElementById("ai-response-text").innerText = `"${spoken}"`;
+      document.getElementById("btn-replay-audio").classList.remove("hidden");
+
+      // Play on laptop audio ONLY if user explicitly checked the mirror box
+      const chkBox = document.getElementById("chk-laptop-audio");
+      const playOnLaptop = chkBox ? chkBox.checked : false;
+      if (playOnLaptop && result.audio_url) {
+        const audio = new Audio(`${result.audio_url}?t=${Date.now()}`);
+        audio.play().catch(e => console.warn("Browser audio play error:", e));
+      }
+    }
+
+    function replayLastAudio() {
+      const audio = new Audio(`/api/audio/last.mp3?t=${Date.now()}`);
+      audio.play().catch(e => console.warn("Replay audio error:", e));
+    }
+
+    async function sendTextPrompt() {
+      const input = document.getElementById("prompt-input");
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      
+      setMicUIThinking();
+      try {
+        const res = await fetch("/api/process_prompt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: text })
+        });
+        const result = await res.json();
+        handleAIResult(result);
+      } catch (e) {
+        console.error("Text prompt error:", e);
+      } finally {
+        resetMicUI();
+        refreshAll();
+      }
+    }
+
+    function quickPrompt(text) {
+      document.getElementById("prompt-input").value = text;
+      sendTextPrompt();
+    }
+
+    // --- Keyboard Shortcuts (Spacebar to Talk, Arrow Keys, Esc) ---
+    window.addEventListener("keydown", (e) => {
+      if (document.activeElement.tagName === "INPUT") return;
+
+      // Spacebar Push-to-Talk
+      if (e.code === "Space" && !spaceKeyDown) {
+        e.preventDefault();
+        spaceKeyDown = true;
+        startRecording();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (isRecording) {
+          cancelMic();
+        } else {
+          sendAction("BACK");
+        }
+        return;
+      }
+
+      if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") sendAction("UP");
+      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") sendAction("DOWN");
+      if (e.key === "Enter") sendAction("SELECT");
+      if (e.key === "Backspace") sendAction("BACK");
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "Space" && spaceKeyDown) {
+        e.preventDefault();
+        spaceKeyDown = false;
+        stopRecording();
+      }
+    });
+
+    // --- Data Hub Loaders ---
+    async function loadTasks() {
+      try {
+        const res = await fetch("/api/tasks");
+        const tasks = await res.json();
+        document.getElementById("tasks-count").innerText = `${tasks.length} Tasks`;
+        const container = document.getElementById("tasks-list");
+        if (tasks.length === 0) {
+          container.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No pending tasks. Use voice to capture one!</div>`;
+          return;
+        }
+        container.innerHTML = tasks.map(t => {
+          const pColor = t.priority === "HIGH" ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                         t.priority === "MEDIUM" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+                         "bg-blue-500/20 text-blue-400 border-blue-500/30";
+          return `
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-slate-600 transition-colors">
+              <div class="flex items-center gap-3">
+                <button onclick="toggleTask(${t.id})" class="w-4 h-4 rounded border border-slate-600 hover:border-emerald-400 flex items-center justify-center text-emerald-400 text-xs transition-colors"></button>
+                <span class="text-xs font-medium text-slate-200">${t.title}</span>
+              </div>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded border ${pColor}">${t.priority}</span>
+            </div>
+          `;
+        }).join("");
+      } catch (e) {
+        console.warn("Load tasks error:", e);
+      }
+    }
+
+    async function toggleTask(id) {
+      await fetch(`/api/tasks/${id}/toggle`, { method: "POST" });
+      refreshAll();
+    }
+
+    async function loadHabits() {
+      try {
+        const res = await fetch("/api/habits");
+        const habits = await res.json();
+        const container = document.getElementById("habits-list");
+        container.innerHTML = habits.map(h => `
+          <div class="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">${h.name}</div>
+              <div class="text-[10px] text-slate-400">${h.last_logged_date || "Not logged today"}</div>
+            </div>
+            <div class="text-base font-black text-amber-400 flex items-center gap-1">
+              🔥 <span>${h.streak_count}</span>
+            </div>
+          </div>
+        `).join("");
+      } catch (e) {
+        console.warn("Load habits error:", e);
+      }
+    }
+
+    async function loadNotes() {
+      try {
+        const res = await fetch("/api/notes");
+        const notes = await res.json();
+        const container = document.getElementById("notes-list");
+        if (notes.length === 0) {
+          container.innerHTML = `<div class="text-xs text-slate-500 py-4 text-center">No notes captured yet. Say 'Note: [idea]'!</div>`;
+          return;
+        }
+        container.innerHTML = notes.map(n => `
+          <div class="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/50 flex items-start justify-between gap-3">
+            <div class="flex-1">
+              <div class="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-note-sticky text-emerald-400"></i> ${n.title}
+              </div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${n.content}</div>
+            </div>
+            <button onclick="playNoteOnSpeaker(${n.id})" class="px-2.5 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-300 text-[10px] font-bold flex items-center gap-1.5 shadow active:scale-95 transition-all">
+              <i class="fa-solid fa-volume-high"></i> Play
+            </button>
+          </div>
+        `).join("");
+      } catch (e) {
+        console.warn("Load notes error:", e);
+      }
+    }
+
+    async function playNoteOnSpeaker(id) {
+      try {
+        const res = await fetch(`/api/notes/${id}/play`, { method: "POST" });
+        const data = await res.json();
+        const chkBox = document.getElementById("chk-laptop-audio");
+        const playOnLaptop = chkBox ? chkBox.checked : false;
+        if (playOnLaptop && data && data.audio_url) {
+          const audio = new Audio(`${data.audio_url}?t=${Date.now()}`);
+          audio.play().catch(e => console.warn("Browser note audio play:", e));
+        }
+      } catch (e) {
+        console.error("Play note error:", e);
+      }
+    }
+
+    function refreshAll() {
+      loadTasks();
+      loadHabits();
+      loadNotes();
+    }
+
+    window.onload = () => {
+      connectWS();
+      refreshAll();
+    };
+  </script>
+</body>
+</html>
