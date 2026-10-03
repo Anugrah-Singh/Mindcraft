@@ -1,0 +1,304 @@
+{
+  "communities": {
+    "0": [
+      "companion_app_ai_cancel",
+      "companion_app_ai_listening",
+      "companion_app_api_play_note",
+      "companion_app_controller_ws",
+      "companion_app_convert_mp3_to_wav",
+      "companion_app_esp32_ws",
+      "companion_app_get_habits",
+      "companion_app_handle_ai_action",
+      "companion_app_handle_button_press",
+      "companion_app_play_note_audio",
+      "companion_app_process_audio",
+      "companion_app_process_audio_async_ai_job",
+      "companion_app_render_screen_state",
+      "companion_app_save_mp3_safely",
+      "companion_app_toggle_task",
+      "companion_storage",
+      "companion_storage_add_note",
+      "companion_storage_add_task",
+      "companion_storage_get_habits",
+      "companion_storage_get_notes",
+      "companion_storage_get_tasks",
+      "companion_storage_init_db",
+      "companion_storage_py_any",
+      "companion_storage_record_habit",
+      "companion_storage_toggle_task",
+      "datetime",
+      "path",
+      "post",
+      "request",
+      "sqlite3",
+      "typing"
+    ],
+    "1": [
+      "asyncio",
+      "basemodel",
+      "companion_app",
+      "companion_app_get_last_audio",
+      "companion_app_get_last_wav",
+      "companion_app_get_notes",
+      "companion_app_get_screen",
+      "companion_app_get_tasks",
+      "companion_app_process_prompt",
+      "companion_app_promptrequest",
+      "companion_app_serve_index",
+      "companion_gemini_service",
+      "companion_tts_service",
+      "dotenv",
+      "edge_tts",
+      "fastapi",
+      "fastapi_middleware_cors",
+      "fastapi_responses",
+      "fastapi_staticfiles",
+      "get",
+      "google",
+      "google_genai",
+      "io",
+      "json",
+      "os",
+      "pathlib",
+      "pydantic",
+      "uvicorn"
+    ],
+    "2": [
+      "esp_a2d_audio_state_t",
+      "esp_a2d_connection_state_t",
+      "firmware_src_audio_speaker_audiospeaker",
+      "firmware_src_audio_speaker_audiospeaker_a2dpdatacallback",
+      "firmware_src_audio_speaker_audiospeaker_audiospeaker",
+      "firmware_src_audio_speaker_audiospeaker_begin",
+      "firmware_src_audio_speaker_audiospeaker_btaudiostatecallback",
+      "firmware_src_audio_speaker_audiospeaker_btconnectionstatecallback",
+      "firmware_src_audio_speaker_audiospeaker_getstatusstring",
+      "firmware_src_audio_speaker_audiospeaker_isaudiostarted",
+      "firmware_src_audio_speaker_audiospeaker_isconnected",
+      "firmware_src_audio_speaker_audiospeaker_isplaying",
+      "firmware_src_audio_speaker_audiospeaker_loop",
+      "firmware_src_audio_speaker_audiospeaker_playurl",
+      "firmware_src_audio_speaker_audiospeaker_queuestartupbeep",
+      "firmware_src_audio_speaker_audiospeaker_stop",
+      "firmware_src_audio_speaker_cpp_firmware_src_audio_speaker",
+      "firmware_src_audio_speaker_cpp_string",
+      "firmware_src_audio_speaker_httpstreamtask",
+      "firmware_src_audio_speaker_popsample",
+      "firmware_src_audio_speaker_pushsample",
+      "firmware_src_audio_speaker_resetbuffer",
+      "firmware_src_audio_speaker_samplesavailable",
+      "firmware_src_audio_speaker_samplesfree",
+      "frame",
+      "math"
+    ],
+    "3": [
+      "arduino",
+      "arduinojson",
+      "bluetootha2dpsource",
+      "esp_task_wdt",
+      "firmware_src_audio_mic_audiomic",
+      "firmware_src_audio_mic_audiomic_audiomic",
+      "firmware_src_audio_mic_audiomic_begin",
+      "firmware_src_audio_mic_audiomic_generatewavheader",
+      "firmware_src_audio_mic_audiomic_streamwavtohub",
+      "firmware_src_audio_mic_cpp_firmware_src_audio_mic",
+      "firmware_src_audio_mic_h_firmware_src_audio_mic",
+      "firmware_src_audio_speaker_h_firmware_src_audio_speaker",
+      "firmware_src_config",
+      "firmware_src_main",
+      "firmware_src_main_loop",
+      "firmware_src_main_setup",
+      "firmware_src_main_websocketevent",
+      "i2s",
+      "websocketsclient",
+      "wifi",
+      "wificlient",
+      "wstype_t"
+    ],
+    "4": [
+      "firmware_src_display_cpp_firmware_src_display",
+      "firmware_src_display_cpp_string",
+      "firmware_src_display_h_firmware_src_display",
+      "firmware_src_display_mindcraftdisplay",
+      "firmware_src_display_mindcraftdisplay_begin",
+      "firmware_src_display_mindcraftdisplay_mindcraftdisplay",
+      "firmware_src_display_mindcraftdisplay_showbootscreen",
+      "firmware_src_display_mindcraftdisplay_showconnected",
+      "firmware_src_display_mindcraftdisplay_showconnecting",
+      "firmware_src_display_mindcraftdisplay_showprocessing",
+      "firmware_src_display_mindcraftdisplay_showready",
+      "firmware_src_display_mindcraftdisplay_showrecording",
+      "firmware_src_display_mindcraftdisplay_u8g2",
+      "firmware_src_display_mindcraftdisplay_updatescreen",
+      "u8g2_ssd1306_128x64_noname_f_hw_i2c",
+      "u8g2lib",
+      "vector"
+    ],
+    "5": [
+      "companion_app_connectionmanager",
+      "companion_app_connectionmanager_broadcast_ai_result",
+      "companion_app_connectionmanager_broadcast_refresh",
+      "companion_app_connectionmanager_broadcast_screen",
+      "companion_app_connectionmanager_connect_browser",
+      "companion_app_connectionmanager_connect_esp32",
+      "companion_app_connectionmanager_disconnect_browser",
+      "companion_app_connectionmanager_disconnect_esp32",
+      "companion_app_connectionmanager_init",
+      "companion_app_connectionmanager_notify_play_audio",
+      "companion_app_connectionmanager_trigger_recording",
+      "websocket"
+    ],
+    "6": [
+      "companion_test_rigorous",
+      "companion_test_rigorous_main",
+      "companion_test_rigorous_run_suite",
+      "companion_test_rigorous_test_rest_endpoints",
+      "companion_test_rigorous_test_text_prompt_ai_pipeline",
+      "companion_test_rigorous_test_voice_audio_upload_pipeline",
+      "companion_test_rigorous_test_websocket_navigation_and_sync",
+      "httpx",
+      "sys",
+      "time",
+      "websockets"
+    ],
+    "7": [
+      "client",
+      "companion_gemini_service_get_client",
+      "companion_gemini_service_process_audio",
+      "companion_gemini_service_process_text_prompt",
+      "companion_gemini_service_py_any",
+      "companion_gemini_service_rationale_105",
+      "companion_gemini_service_rationale_73"
+    ],
+    "8": [
+      "companion_tts_service_rationale_10",
+      "companion_tts_service_rationale_21",
+      "companion_tts_service_synthesize_speech",
+      "companion_tts_service_text_to_speech_mp3"
+    ]
+  },
+  "cohesion": {
+    "0": 0.11397849462365592,
+    "1": 0.10846560846560846,
+    "2": 0.15076923076923077,
+    "3": 0.12554112554112554,
+    "4": 0.19117647058823528,
+    "5": 0.3181818181818182,
+    "6": 0.2727272727272727,
+    "7": 0.3333333333333333,
+    "8": 0.5
+  },
+  "gods": [
+    {
+      "id": "firmware_src_audio_speaker_audiospeaker",
+      "label": "AudioSpeaker",
+      "degree": 13
+    },
+    {
+      "id": "companion_app_connectionmanager",
+      "label": "ConnectionManager",
+      "degree": 11
+    },
+    {
+      "id": "firmware_src_display_mindcraftdisplay",
+      "label": "MindcraftDisplay",
+      "degree": 11
+    },
+    {
+      "id": "companion_app_render_screen_state",
+      "label": "render_screen_state()",
+      "degree": 10
+    },
+    {
+      "id": "companion_app_handle_ai_action",
+      "label": "handle_ai_action()",
+      "degree": 9
+    },
+    {
+      "id": "companion_app_handle_button_press",
+      "label": "handle_button_press()",
+      "degree": 8
+    },
+    {
+      "id": "companion_app_play_note_audio",
+      "label": "play_note_audio()",
+      "degree": 7
+    },
+    {
+      "id": "companion_storage_get_notes",
+      "label": "get_notes()",
+      "degree": 7
+    },
+    {
+      "id": "companion_test_rigorous_run_suite",
+      "label": "run_suite()",
+      "degree": 6
+    },
+    {
+      "id": "companion_storage_get_tasks",
+      "label": "get_tasks()",
+      "degree": 5
+    }
+  ],
+  "surprises": [
+    {
+      "source": "get_tasks()",
+      "target": "get_tasks()",
+      "source_files": [
+        "companion/app.py",
+        "companion/storage.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "get_notes()",
+      "target": "get_notes()",
+      "source_files": [
+        "companion/app.py",
+        "companion/storage.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "play_note_audio()",
+      "target": "text_to_speech_mp3()",
+      "source_files": [
+        "companion/app.py",
+        "companion/tts_service.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "handle_ai_action()",
+      "target": "text_to_speech_mp3()",
+      "source_files": [
+        "companion/app.py",
+        "companion/tts_service.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "render_screen_state()",
+      "target": "get_habits()",
+      "source_files": [
+        "companion/app.py",
+        "companion/storage.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "cross-file semantic connection"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

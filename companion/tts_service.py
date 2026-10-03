@@ -8,9 +8,9 @@ VOICE = "en-US-ChristopherNeural"  # Clear, articulate voice
 
 async def text_to_speech_mp3(text: str) -> bytes:
     """
-    Synthesize text into MP3 audio bytes using edge-tts.
+    Synthesize text into MP3 audio bytes using edge-tts with maximum output volume.
     """
-    communicate = edge_tts.Communicate(text, VOICE)
+    communicate = edge_tts.Communicate(text, VOICE, volume="+0%")
     mp3_data = io.BytesIO()
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":

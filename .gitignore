@@ -24,3 +24,9 @@ companion/*.wav
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local run artefacts
+snapshots/
+companion/bridge.log
+companion/server_*.log
+*.bak

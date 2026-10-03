@@ -1,0 +1,80 @@
+{
+  "companion/app.py": {
+    "mtime": 1790958027.4569478,
+    "seen": 1790997890.742818,
+    "ast_hash": "02ff6e0b1eb5242bb14e3f24398fca07",
+    "semantic_hash": "02ff6e0b1eb5242bb14e3f24398fca07"
+  },
+  "companion/gemini_service.py": {
+    "mtime": 1790886959.6349175,
+    "seen": 1790997890.742818,
+    "ast_hash": "b8f0e6354a0c4fe5df0b40811fd75801",
+    "semantic_hash": "b8f0e6354a0c4fe5df0b40811fd75801"
+  },
+  "companion/storage.py": {
+    "mtime": 1790814255.5261023,
+    "seen": 1790997890.742818,
+    "ast_hash": "b1c22cfd880c672175c2040c5717df0c",
+    "semantic_hash": "b1c22cfd880c672175c2040c5717df0c"
+  },
+  "companion/test_rigorous.py": {
+    "mtime": 1790923359.680002,
+    "seen": 1790997890.742818,
+    "ast_hash": "26c79bdc4bf065339d3b4bdd77bf64e2",
+    "semantic_hash": "26c79bdc4bf065339d3b4bdd77bf64e2"
+  },
+  "companion/tts_service.py": {
+    "mtime": 1790947624.875955,
+    "seen": 1790997890.742818,
+    "ast_hash": "d14a3871935e9a62bde057f45534a11e",
+    "semantic_hash": "d14a3871935e9a62bde057f45534a11e"
+  },
+  "firmware/src/audio_mic.cpp": {
+    "mtime": 1790962776.7041936,
+    "seen": 1790997890.742818,
+    "ast_hash": "1601a431c35e19f30b8181f6d928b5ca",
+    "semantic_hash": "1601a431c35e19f30b8181f6d928b5ca"
+  },
+  "firmware/src/audio_mic.h": {
+    "mtime": 1790962768.3416784,
+    "seen": 1790997890.742818,
+    "ast_hash": "058e36665c4d9e6b3fb430025b55d9c9",
+    "semantic_hash": "058e36665c4d9e6b3fb430025b55d9c9"
+  },
+  "firmware/src/audio_speaker.cpp": {
+    "mtime": 1790997250.6853228,
+    "seen": 1790997890.742818,
+    "ast_hash": "e2722b7e58a4285154ead4f667241cb8",
+    "semantic_hash": "e2722b7e58a4285154ead4f667241cb8"
+  },
+  "firmware/src/audio_speaker.h": {
+    "mtime": 1790962785.9555163,
+    "seen": 1790997890.742818,
+    "ast_hash": "8d0ed45ede47ad88a2f1b41aa29082e8",
+    "semantic_hash": "8d0ed45ede47ad88a2f1b41aa29082e8"
+  },
+  "firmware/src/config.h": {
+    "mtime": 1790996580.1979933,
+    "seen": 1790997890.742818,
+    "ast_hash": "7f5c8e5742eac6b40234a524f37edc88",
+    "semantic_hash": "7f5c8e5742eac6b40234a524f37edc88"
+  },
+  "firmware/src/display.cpp": {
+    "mtime": 1790994933.167372,
+    "seen": 1790997890.742818,
+    "ast_hash": "863f6dc1e3980247b2b458609d5d2249",
+    "semantic_hash": "863f6dc1e3980247b2b458609d5d2249"
+  },
+  "firmware/src/display.h": {
+    "mtime": 1790994921.6143641,
+    "seen": 1790997890.742818,
+    "ast_hash": "e1aab7f287ee32c773aa0b3b4e28e61b",
+    "semantic_hash": "e1aab7f287ee32c773aa0b3b4e28e61b"
+  },
+  "firmware/src/main.cpp": {
+    "mtime": 1790997756.8923085,
+    "seen": 1790997890.742818,
+    "ast_hash": "dfa8657cae9d13c93c618a0a2c774424",
+    "semantic_hash": "dfa8657cae9d13c93c618a0a2c774424"
+  }
+}

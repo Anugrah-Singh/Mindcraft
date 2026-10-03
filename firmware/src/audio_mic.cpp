@@ -1,5 +1,6 @@
 #include "audio_mic.h"
 #include "config.h"
+#include "display.h"
 
 #define I2S_MIC_PORT I2S_NUM_0
 
@@ -9,12 +10,12 @@ bool AudioMic::begin() {
     i2s_config_t i2s_config = {
         .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
         .sample_rate = SAMPLE_RATE,
-        .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT, // INMP441 works best with 32-bit slot
-        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
+        .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT, // INMP441 uses 24-bit in 32-bit slot
+        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,  // Standard 2-channel I2S framing
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-        .dma_buf_count = 4,
-        .dma_buf_len = 1024,
+        .dma_buf_count = 6,
+        .dma_buf_len = 256,
         .use_apll = false,
         .tx_desc_auto_clear = false,
         .fixed_mclk = 0
@@ -34,85 +35,158 @@ bool AudioMic::begin() {
     return (err == ESP_OK);
 }
 
-void AudioMic::generateWavHeader(uint8_t* header, size_t wavDataSize, uint32_t sampleRate, uint16_t numChannels, uint16_t bitsPerSample) {
-    uint32_t totalFileSize = wavDataSize + 44 - 8;
-    uint32_t byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-    uint16_t blockAlign = numChannels * (bitsPerSample / 8);
+// ---------------------------------------------------------------------------
+// Voice-activity-gated recording.
+//
+// Listens until speech starts, streams it to the laptop, and stops after the speaker has
+// been quiet for VAD_END_SILENCE_MS. Nothing is sent while waiting; a short pre-roll is
+// kept so the first syllable is not clipped.
+//
+// Wire format (the length is not known up front):
+//   "@R*\n", then repeated chunks [uint16 LE byte_count][PCM bytes], ended by a zero count.
+//   PCM is 16-bit mono at MIC_OUT_RATE. If no speech is heard, only "@R*\n" + zero count.
+// No log lines may be printed while a recording is being sent.
+// ---------------------------------------------------------------------------
+#define VAD_FRAME           441     // 20 ms at 22.05 kHz
+#define VAD_PREROLL_FRAMES  25      // 500 ms kept from before speech was detected
+#define VAD_CALIB_FRAMES    15      // 300 ms used to measure the room's noise floor
+#define VAD_START_FRAMES    5       // 100 ms above threshold = speech has started
+#define VAD_END_SILENCE_MS  1200
+#define VAD_MAX_WAIT_MS     8000    // give up if nobody speaks
+#define VAD_MAX_SPEECH_MS   20000   // hard cap on one recording
 
-    memcpy(header, "RIFF", 4);
-    header[4] = (uint8_t)(totalFileSize & 0xFF);
-    header[5] = (uint8_t)((totalFileSize >> 8) & 0xFF);
-    header[6] = (uint8_t)((totalFileSize >> 16) & 0xFF);
-    header[7] = (uint8_t)((totalFileSize >> 24) & 0xFF);
-    memcpy(header + 8, "WAVEfmt ", 8);
-    header[16] = 16; header[17] = 0; header[18] = 0; header[19] = 0; // Subchunk1Size (16 for PCM)
-    header[20] = 1; header[21] = 0; // AudioFormat (1 for PCM)
-    header[22] = (uint8_t)(numChannels & 0xFF);
-    header[23] = (uint8_t)((numChannels >> 8) & 0xFF);
-    header[24] = (uint8_t)(sampleRate & 0xFF);
-    header[25] = (uint8_t)((sampleRate >> 8) & 0xFF);
-    header[26] = (uint8_t)((sampleRate >> 16) & 0xFF);
-    header[27] = (uint8_t)((sampleRate >> 24) & 0xFF);
-    header[28] = (uint8_t)(byteRate & 0xFF);
-    header[29] = (uint8_t)((byteRate >> 8) & 0xFF);
-    header[30] = (uint8_t)((byteRate >> 16) & 0xFF);
-    header[31] = (uint8_t)((byteRate >> 24) & 0xFF);
-    header[32] = (uint8_t)(blockAlign & 0xFF);
-    header[33] = (uint8_t)((blockAlign >> 8) & 0xFF);
-    header[34] = (uint8_t)(bitsPerSample & 0xFF);
-    header[35] = (uint8_t)((bitsPerSample >> 8) & 0xFF);
-    memcpy(header + 36, "data", 4);
-    header[40] = (uint8_t)(wavDataSize & 0xFF);
-    header[41] = (uint8_t)((wavDataSize >> 8) & 0xFF);
-    header[42] = (uint8_t)((wavDataSize >> 16) & 0xFF);
-    header[43] = (uint8_t)((wavDataSize >> 24) & 0xFF);
+static void sendChunk(const int16_t* pcm, size_t samples) {
+    uint16_t bytes = (uint16_t)(samples * sizeof(int16_t));
+    uint8_t len[2] = { (uint8_t)(bytes & 0xFF), (uint8_t)(bytes >> 8) };
+    Serial.write(len, 2);
+    Serial.write((const uint8_t*)pcm, bytes);
 }
 
-uint8_t* AudioMic::recordWav(int seconds, size_t& wavSize) {
-    size_t sampleCount = SAMPLE_RATE * seconds;
-    size_t pcmBytes = sampleCount * sizeof(int16_t);
-    wavSize = 44 + pcmBytes;
-
-    if (ESP.getFreeHeap() < (wavSize + 50000)) {
-        Serial.printf("[MIC] Heap constrained (%d free). Skipping local buffer allocation.\n", ESP.getFreeHeap());
-        wavSize = 0;
-        return nullptr;
+bool AudioMic::recordToSerial() {
+    int16_t* preroll = (int16_t*)malloc(VAD_PREROLL_FRAMES * VAD_FRAME * sizeof(int16_t));
+    if (!preroll) {
+        Serial.println("[MIC] Not enough memory for the pre-roll buffer.");
+        return false;
     }
 
-    if (audioBuffer) free(audioBuffer);
-    audioBuffer = (uint8_t*)malloc(wavSize);
-    if (!audioBuffer) return nullptr;
+    int32_t rawChunk[256];          // 128 left/right pairs
+    int16_t frame[VAD_FRAME];
+    size_t frameLen = 0;
 
-    generateWavHeader(audioBuffer, pcmBytes, SAMPLE_RATE, 1, 16);
+    float prevInput = 0.0f, prevOutput = 0.0f;
+    const float DC_R = 0.995f;
+    const float MIC_GAIN = 8.0f;    // applied after >>16 (24-bit mic data -> 16-bit)
+    bool haveHalf = false;
+    float half = 0.0f;
 
-    int16_t* pcmSamples = (int16_t*)(audioBuffer + 44);
-    size_t samplesRemaining = sampleCount;
-    size_t samplesWritten = 0;
-    const size_t CHUNK_SIZE = 256;
-    int32_t rawChunk[CHUNK_SIZE];
+    // VAD state
+    size_t frameCount = 0;          // frames processed so far
+    float minLevel = 1e9f, floorLevel = 0.0f, threshold = 400.0f;
+    size_t above = 0, silence = 0, streamedFrames = 0;
+    size_t prerollHead = 0, prerollFill = 0;   // circular buffer of frames
+    bool streaming = false, headerSent = false, done = false;
+    uint32_t sentBytes = 0;
 
+    const size_t maxWaitFrames   = VAD_MAX_WAIT_MS / 20;
+    const size_t endSilenceFrames = VAD_END_SILENCE_MS / 20;
+    const size_t maxSpeechFrames = VAD_MAX_SPEECH_MS / 20;
     unsigned long startTime = millis();
-    unsigned long maxDuration = (seconds * 1000) + 1500; // Hard timeout watchdog
 
-    while (samplesRemaining > 0 && (millis() - startTime < maxDuration)) {
-        size_t toRead = (samplesRemaining < CHUNK_SIZE) ? samplesRemaining : CHUNK_SIZE;
+    while (!done && millis() - startTime < (unsigned long)(VAD_MAX_WAIT_MS + VAD_MAX_SPEECH_MS + 3000)) {
         size_t bytesRead = 0;
-        esp_err_t res = i2s_read(I2S_MIC_PORT, rawChunk, toRead * sizeof(int32_t), &bytesRead, pdMS_TO_TICKS(100));
-        
+        esp_err_t res = i2s_read(I2S_MIC_PORT, rawChunk, sizeof(rawChunk), &bytesRead, pdMS_TO_TICKS(100));
         if (res != ESP_OK || bytesRead == 0) {
-            delay(5);
+            delay(1);
             continue;
         }
+        size_t pairs = bytesRead / (2 * sizeof(int32_t));
+        for (size_t i = 0; i < pairs && !done; i++) {
+            float x = (float)(rawChunk[i * 2] >> 16);  // LEFT slot (L/R pin -> GND)
+            float y = x - prevInput + DC_R * prevOutput;
+            prevInput = x;
+            prevOutput = y;
+            float v = y * MIC_GAIN;
+            if (v > 32767.0f) v = 32767.0f;
+            if (v < -32768.0f) v = -32768.0f;
 
-        size_t count = bytesRead / sizeof(int32_t);
-        for (size_t i = 0; i < count; i++) {
-            pcmSamples[samplesWritten++] = (int16_t)(rawChunk[i] >> 14);
+            // Decimate 44.1 kHz -> 22.05 kHz by averaging sample pairs.
+            if (!haveHalf) { half = v; haveHalf = true; continue; }
+            haveHalf = false;
+            frame[frameLen++] = (int16_t)((half + v) * 0.5f);
+            if (frameLen < VAD_FRAME) continue;
+            frameLen = 0;
+
+            // ---- one 20 ms frame is complete ----
+            float sum = 0;
+            for (size_t k = 0; k < VAD_FRAME; k++) sum += (float)abs((int)frame[k]);
+            float level = sum / VAD_FRAME;
+            frameCount++;
+            if (frameCount % 5 == 0) {   // every 100 ms: live level meter on the OLED (partial update)
+                display.recordLevel((uint16_t)level, streaming, (uint32_t)streamedFrames * 20);
+            }
+
+            if (streaming) {
+                sendChunk(frame, VAD_FRAME);
+                sentBytes += VAD_FRAME * sizeof(int16_t);
+                streamedFrames++;
+                silence = (level > threshold) ? 0 : silence + 1;
+                if (silence >= endSilenceFrames || streamedFrames >= maxSpeechFrames) done = true;
+                continue;
+            }
+
+            // keep the most recent frames as pre-roll
+            memcpy(preroll + prerollHead * VAD_FRAME, frame, VAD_FRAME * sizeof(int16_t));
+            prerollHead = (prerollHead + 1) % VAD_PREROLL_FRAMES;
+            if (prerollFill < VAD_PREROLL_FRAMES) prerollFill++;
+
+            if (frameCount <= VAD_CALIB_FRAMES) {
+                // Measure the room noise; the quietest frame is used so that speech which
+                // starts immediately after the button press does not raise the floor.
+                if (level < minLevel) minLevel = level;
+                if (frameCount == VAD_CALIB_FRAMES) {
+                    floorLevel = minLevel < 800.0f ? minLevel : 800.0f;
+                    threshold = floorLevel * 3.0f + 150.0f;
+                    if (threshold < 400.0f) threshold = 400.0f;
+                }
+                continue;
+            }
+
+            if (level > threshold) {
+                above++;
+            } else {
+                above = 0;
+                floorLevel = 0.98f * floorLevel + 0.02f * level;   // follow slow noise changes
+                threshold = floorLevel * 3.0f + 150.0f;
+                if (threshold < 400.0f) threshold = 400.0f;
+            }
+
+            if (above >= VAD_START_FRAMES) {
+                // Speech started: send header, then the pre-roll in chronological order.
+                Serial.print("@R*\n");
+                headerSent = true;
+                size_t first = (prerollHead + VAD_PREROLL_FRAMES - prerollFill) % VAD_PREROLL_FRAMES;
+                for (size_t f = 0; f < prerollFill; f++) {
+                    sendChunk(preroll + ((first + f) % VAD_PREROLL_FRAMES) * VAD_FRAME, VAD_FRAME);
+                    sentBytes += VAD_FRAME * sizeof(int16_t);
+                }
+                streaming = true;
+                silence = 0;
+            } else if (frameCount - VAD_CALIB_FRAMES >= maxWaitFrames) {
+                done = true;   // nobody spoke
+            }
         }
-        samplesRemaining -= count;
     }
 
-    Serial.printf("[MIC] Finished recording. Samples captured: %d\n", samplesWritten);
-    return audioBuffer;
+    if (!headerSent) Serial.print("@R*\n");
+    uint8_t endMarker[2] = { 0, 0 };
+    Serial.write(endMarker, 2);
+    Serial.flush();
+    free(preroll);
+
+    Serial.printf("[MIC] %s: sent %u bytes (%.1f s), noise floor %.0f, threshold %.0f\n",
+                  streaming ? "Speech recorded" : "No speech heard", (unsigned)sentBytes,
+                  sentBytes / 2.0f / MIC_OUT_RATE, floorLevel, threshold);
+    return streaming;
 }
 
 AudioMic mic;
