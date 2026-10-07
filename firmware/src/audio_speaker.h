@@ -10,8 +10,6 @@ public:
     void loop();
     void stop();
     bool isConnected();
-    bool isAudioStarted();
-    bool isPlaying();
     String getStatusString();
 
     // Clip playback: the host streams 16-bit mono 22.05 kHz PCM over USB.

@@ -95,4 +95,3 @@ Keys: Space = record, W/S or arrows = move, Enter = select, Esc/Backspace = back
 - Once speech has started during a recording, mirror frames pause, because text frames would
   corrupt the binary recording stream. They resume when the recording ends.
 - A cosmetic burst of non-text bytes sometimes shows up in the bridge log when a clip starts; audio is unaffected.
-- `companion/test_rigorous.py` and the `*.bak` files in `firmware/src` are leftovers from earlier sessions.

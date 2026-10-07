@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <U8g2lib.h>
-#include <vector>
 
 // 128x64 SSD1306 UI. The hub sends structured screens ("view": menu / tasks / habits / notes /
 // ai / status); the same layouts are drawn by the dashboard's OLED mirror.
@@ -14,8 +13,6 @@ public:
 
     // Structured screen from the hub (falls back to the legacy text layout without "view").
     void showScreen(JsonObjectConst screen);
-    void updateScreen(const String& title, const std::vector<String>& lines,
-                      const String& footer_left, const String& footer_right);
 
     void showWaiting();              // wordmark + link status, shown until the hub sends a screen
     void showProcessing();
@@ -25,7 +22,6 @@ public:
     void recordLevel(uint16_t level, bool speaking, uint32_t elapsedMs);
 
     void setBtConnected(bool connected);
-    void setHubLinked(bool linked);
     void tick();                     // call every loop: animates the status screens
     bool hasScreen() const { return haveScreen; }
 

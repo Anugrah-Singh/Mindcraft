@@ -213,6 +213,31 @@
     .act.danger:hover, .act.confirm { color: var(--rec); }
     .act.confirm { font-weight: 600; }
 
+    /* ---- add / edit controls ---- */
+    .addrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 2px 0 14px; }
+    .addrow input[type="text"] { flex: 1; min-width: 150px; }
+    .addrow input, .addrow select, .edit-input, .search { padding: 9px 12px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink); }
+    .addrow select { padding-right: 8px; }
+    .edit-input { width: 100%; font-family: inherit; }
+    textarea.edit-input { resize: vertical; min-height: 84px; font-family: var(--font-text); }
+    .search { width: 100%; max-width: 280px; padding: 7px 12px; }
+    .tools { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+    .newnote { display: grid; gap: 8px; margin: 0 0 16px; padding: 12px; border: 1px dashed var(--rule); border-radius: 12px; }
+    .newnote textarea { min-height: 90px; }
+    .task { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+    .task .pri { border: 0; background: none; padding: 2px 4px; border-radius: 6px; font: inherit; font-weight: 700; letter-spacing: .04em; }
+    .task .pri:hover { background: var(--rule); }
+    .task .box.on { color: var(--ok); border-color: var(--ok); }
+    .task.done .title { text-decoration: line-through; color: var(--ink-2); }
+    .row-actions { display: flex; gap: 14px; }
+    .note-edit { grid-column: 1 / -1; display: grid; gap: 8px; }
+    .note.expanded p { display: block; -webkit-line-clamp: unset; white-space: pre-wrap; }
+    .habit .mini { display: flex; gap: 14px; margin-top: 2px; }
+    .act.small { font-size: 13px; padding: 2px 0; }
+    .habit .undo { margin-left: 10px; }
+    .export { text-decoration: none; display: inline-flex; align-items: center; padding: 7px 12px; font-size: 14px; }
+    @media (max-width: 640px) { .task { grid-template-columns: auto auto minmax(0, 1fr); } .task .row-actions { grid-column: 3; } }
+
     /* the one motion: a highlighter sweep behind whatever just changed */
     .fresh { background-image: linear-gradient(var(--hi), var(--hi)); background-repeat: no-repeat; background-position: 0 70%; background-size: 0% 62%; animation: sweep 1.6s ease-out .1s forwards; }
     @keyframes sweep { 0% { background-size: 0% 62%; } 25% { background-size: 100% 62%; } 80% { background-size: 100% 62%; } 100% { background-size: 100% 0%; background-position: 0 100%; } }
@@ -248,6 +273,7 @@
         <span><i class="led" id="led-hub" data-state="warn"></i>Hub</span>
         <span><i class="led" id="led-usb" data-state="off"></i>USB device</span>
         <span><i class="led" id="led-bt" data-state="off"></i>Stone 190 speaker</span>
+        <a class="btn-ghost export" href="/api/export" download title="Download all tasks, habits and notes as a JSON backup">Export</a>
         <button class="theme-btn" id="theme-btn" type="button" aria-label="Switch colour theme" title="Switch colour theme"><svg class="icon" id="theme-icon"><use href="#i-moon"/></svg></button>
       </div>
     </header>
@@ -289,6 +315,7 @@
             <button class="link" type="button" data-say="Add a high priority task to send the invoice">Add a task</button>
             <button class="link" type="button" data-say="I went to the gym today">Log gym</button>
             <button class="link" type="button" data-say="Note: ask the supplier about the 5 volt power adapter">Take a note</button>
+            <button class="link" type="button" data-say="What are my tasks?">Read my tasks</button>
             <button class="link" type="button" data-say="What is the capital of Australia?">Ask a question</button>
           </div>
           <label class="check"><input type="checkbox" id="chk-laptop-audio" /> Also play replies on this computer</label>
@@ -314,15 +341,49 @@
             <div class="tracker-head" aria-hidden="true"><span></span><span class="days"><span id="days-from"></span><span>Today</span></span><span></span></div>
             <div id="habits"><p class="empty">Loading habits&hellip;</p></div>
           </div>
+          <form class="addrow" id="habit-form" autocomplete="off" style="margin-top:12px">
+            <label class="sr" for="habit-name">New habit</label>
+            <input type="text" id="habit-name" maxlength="30" placeholder="Track a new habit, e.g. Meditation" />
+            <button class="btn-ghost" type="submit">Add habit</button>
+          </form>
         </section>
 
         <section class="block">
-          <div class="block-head"><h2>Tasks</h2><span class="count num" id="tasks-count"></span></div>
+          <div class="block-head">
+            <h2>Tasks</h2>
+            <span class="tools">
+              <label class="check"><input type="checkbox" id="chk-completed" /> Show completed</label>
+              <button class="act danger small" id="clear-done" type="button" hidden><span>Clear completed</span></button>
+              <span class="count num" id="tasks-count"></span>
+            </span>
+          </div>
+          <form class="addrow" id="task-form" autocomplete="off">
+            <label class="sr" for="task-title">New task</label>
+            <input type="text" id="task-title" maxlength="200" placeholder="Add a task" />
+            <label class="sr" for="task-pri">Priority</label>
+            <select id="task-pri"><option value="HIGH">High</option><option value="MEDIUM" selected>Medium</option><option value="LOW">Low</option></select>
+            <button class="btn-ghost" type="submit">Add task</button>
+          </form>
           <ul class="list" id="tasks"><li class="empty">Loading tasks&hellip;</li></ul>
         </section>
 
         <section class="block">
-          <div class="block-head"><h2>Voice notes</h2><span class="count num" id="notes-count"></span></div>
+          <div class="block-head">
+            <h2>Voice notes</h2>
+            <span class="tools">
+              <label class="sr" for="note-search">Search notes</label>
+              <input class="search" type="search" id="note-search" placeholder="Search notes" />
+              <button class="btn-ghost" id="new-note-btn" type="button">New note</button>
+              <span class="count num" id="notes-count"></span>
+            </span>
+          </div>
+          <form class="newnote" id="note-form" autocomplete="off" hidden>
+            <label class="sr" for="note-title">Title</label>
+            <input class="edit-input" type="text" id="note-title" maxlength="80" placeholder="Title (optional)" />
+            <label class="sr" for="note-content">Note</label>
+            <textarea class="edit-input" id="note-content" placeholder="What do you want to remember?"></textarea>
+            <div class="tools"><button class="btn-ghost btn-primary" type="submit">Save note</button><button class="btn-ghost" type="button" id="note-cancel">Cancel</button></div>
+          </form>
           <ul class="list" id="notes"><li class="empty">Loading notes&hellip;</li></ul>
         </section>
       </article>
@@ -333,7 +394,7 @@
   <script>
     "use strict";
     const $ = (id) => document.getElementById(id);
-    const KIND_LABELS = { TASK: "Task added", NOTE: "Note saved", HABIT: "Habit logged", TASK_DONE: "Task done", CONVERSATION: "Answer", ERROR: "Something went wrong", READY: "Ready" };
+    const KIND_LABELS = { TASK: "Task added", NOTE: "Note saved", HABIT: "Habit logged", TASK_DONE: "Task done", DELETE_TASK: "Task deleted", LIST_TASKS: "Your tasks", PLAY_NOTE: "Playing note", DELETE_NOTE: "Note deleted", CONVERSATION: "Answer", ERROR: "Something went wrong", READY: "Ready" };
     const PRIORITY_MARK = { HIGH: "!!!", MEDIUM: "!!", LOW: "!" };
     const PRIORITY_NAME = { HIGH: "High priority", MEDIUM: "Medium priority", LOW: "Low priority" };
     let ws = null, retry = 0;
@@ -514,19 +575,58 @@
     });
     document.querySelectorAll("[data-say]").forEach((b) => b.addEventListener("click", () => { $("prompt-input").value = b.dataset.say; $("prompt-form").requestSubmit(); }));
 
-    /* ---------- habits, tasks, notes ---------- */
+    /* ---------- shared helpers for habits, tasks, notes ---------- */
+    let editing = false, dirty = false;                    // while a row is being edited, background refreshes wait
+    async function mutate(method, path, body, okMsg) {
+      try {
+        const res = await fetch(path, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
+        if (!res.ok) {
+          let detail = ""; try { detail = (await res.json()).detail || ""; } catch (e) {}
+          throw new Error(typeof detail === "string" && detail ? detail : `That did not work (${res.status}).`);
+        }
+        if (okMsg) toast(okMsg);
+        return await res.json().catch(() => ({}));
+      } catch (e) {
+        toast(e instanceof TypeError ? "Could not reach the hub. Check that it is running." : e.message);
+        return null;
+      }
+    }
+    function armed(btn, confirmText) {                      // two-step delete: the first click arms it
+      if (btn.classList.contains("confirm")) return true;
+      const label = btn.querySelector("span"), orig = label.textContent;
+      btn.classList.add("confirm"); label.textContent = confirmText;
+      setTimeout(() => { if (btn.isConnected) { btn.classList.remove("confirm"); label.textContent = orig; } }, 3000);
+      return false;
+    }
+    function inlineEdit(el, { label, onSave }) {            // swap `el` for a text box; Enter or blur saves, Esc cancels
+      editing = true;
+      const old = el.textContent;
+      const input = document.createElement("input");
+      input.type = "text"; input.className = "edit-input"; input.value = old; input.setAttribute("aria-label", label);
+      el.replaceWith(input); input.focus(); input.select();
+      let finished = false;
+      const finish = async (save) => {
+        if (finished) return; finished = true; editing = false;
+        const v = input.value.trim();
+        if (save && v && v !== old) await onSave(v);
+        refreshAll(true);
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        else if (e.key === "Escape") { e.stopPropagation(); finish(false); }
+      });
+      input.addEventListener("blur", () => finish(true));
+    }
+
+    /* ---------- habits ---------- */
     const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     function streakDots(h) {
       const today = new Date(); today.setHours(12, 0, 0, 0);
-      const live = new Set();
-      if (h.streak_count > 0 && h.last_logged_date) {
-        const last = new Date(h.last_logged_date + "T12:00:00");
-        for (let i = 0; i < h.streak_count; i++) { const d = new Date(last); d.setDate(d.getDate() - i); live.add(ymd(d)); }
-      }
+      const logged = new Set(h.history || []);              // real log dates from the hub
       let out = "";
       for (let i = 13; i >= 0; i--) {
         const d = new Date(today); d.setDate(d.getDate() - i);
-        out += `<i class="${live.has(ymd(d)) ? "on" : ""}${i === 0 ? " today" : ""}" title="${ymd(d)}"></i>`;
+        out += `<i class="${logged.has(ymd(d)) ? "on" : ""}${i === 0 ? " today" : ""}" title="${ymd(d)}"></i>`;
       }
       return out;
     }
@@ -538,75 +638,190 @@
         const from = new Date(); from.setDate(from.getDate() - 13);
         $("days-from").textContent = from.toLocaleDateString([], { month: "short", day: "numeric" });
         $("habits").innerHTML = habits.map((h) => `
-          <div class="habit ${h.name === flashName ? "fresh" : ""}">
-            <div><h3>${escapeHtml(h.name)}</h3><div class="streak"><b class="num">${h.streak_count}</b> day streak</div></div>
+          <div class="habit ${h.name === flashName ? "fresh" : ""}" data-id="${h.id}">
+            <div><h3>${escapeHtml(h.name)}</h3><div class="streak"><b class="num">${h.streak_count}</b> day streak</div>
+              <div class="mini">
+                <button class="act danger small" type="button" data-act="rename" data-id="${h.id}"><span>Rename</span></button>
+                <button class="act danger small" type="button" data-act="del" data-id="${h.id}" aria-label="Delete ${escapeHtml(h.name)}"><span>Delete</span></button>
+              </div></div>
             <div class="dots" role="img" aria-label="${escapeHtml(h.name)}: last 14 days, ${h.streak_count} day streak">${streakDots(h)}</div>
             <div class="log">${h.logged_today
-              ? `<span class="done"><svg class="icon"><use href="#i-check"/></svg>Done today</span>`
-              : `<button class="btn-ghost" type="button" data-log="${escapeHtml(h.name)}">Log today</button>`}</div>
-          </div>`).join("") || `<p class="empty">No habits yet. Say &ldquo;I went to the gym&rdquo; to start one.</p>`;
-        document.querySelectorAll("[data-log]").forEach((b) => b.addEventListener("click", async () => {
-          try { const r = await api("/api/habits/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: b.dataset.log }) }); toast(`${r.name}: ${r.streak_count} day streak`); loadHabits(r.name); return; }
-          catch (e) { toast("Could not log that habit. Try again."); }
-          loadHabits();
-        }));
+              ? `<span class="done"><svg class="icon"><use href="#i-check"/></svg>Done today</span><button class="act small undo" type="button" data-act="undo" data-name="${escapeHtml(h.name)}"><span>Undo</span></button>`
+              : `<button class="btn-ghost" type="button" data-act="log" data-name="${escapeHtml(h.name)}">Log today</button>`}</div>
+          </div>`).join("") || `<p class="empty">No habits yet. Add one below, or say &ldquo;I went to the gym&rdquo;.</p>`;
       } catch (e) { $("habits").innerHTML = `<p class="empty">Could not load habits. Check that the hub is running.</p>`; }
     }
+    $("habits").addEventListener("click", async (e) => {
+      const b = e.target.closest("button[data-act]"); if (!b) return;
+      const act = b.dataset.act;
+      if (act === "log") {
+        const r = await mutate("POST", "/api/habits/log", { name: b.dataset.name });
+        if (r) { toast(`${r.name}: ${r.streak_count} day streak`); loadHabits(r.name); }
+      } else if (act === "undo") {
+        if (await mutate("POST", "/api/habits/unlog", { name: b.dataset.name }, "Today's log removed")) loadHabits();
+      } else if (act === "rename") {
+        const row = b.closest(".habit");
+        inlineEdit(row.querySelector("h3"), { label: "Habit name", onSave: (v) => mutate("PATCH", `/api/habits/${row.dataset.id}`, { name: v }, "Habit renamed") });
+      } else if (act === "del") {
+        if (!armed(b, "Delete habit?")) return;
+        if (await mutate("DELETE", `/api/habits/${b.dataset.id}`, null, "Habit deleted")) loadHabits();
+      }
+    });
+    $("habit-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = $("habit-name"), name = input.value.trim();
+      if (!name) return;
+      const r = await mutate("POST", "/api/habits", { name }, "Habit added");
+      if (r) { input.value = ""; loadHabits(r.name); }
+    });
+
+    /* ---------- tasks ---------- */
+    let showDone = false;
+    try { showDone = localStorage.getItem("mc-show-done") === "1"; } catch (e) {}
+    $("chk-completed").checked = showDone;
+    $("chk-completed").addEventListener("change", (e) => {
+      showDone = e.target.checked;
+      try { localStorage.setItem("mc-show-done", showDone ? "1" : "0"); } catch (err) {}
+      loadTasks();
+    });
+    const NEXT_PRI = { HIGH: "MEDIUM", MEDIUM: "LOW", LOW: "HIGH" };
     async function loadTasks() {
       try {
-        const tasks = await api("/api/tasks");
-        const fresh = freshIds("tasks", tasks);
-        $("tasks-count").textContent = `${tasks.length} open`;
-        $("tasks").innerHTML = tasks.map((t) => `
-          <li class="task">
-            <button class="box" type="button" data-done="${t.id}" aria-label="Mark done: ${escapeHtml(t.title)}"><svg class="icon" style="width:15px;height:15px"><use href="#i-check"/></svg></button>
-            <span class="pri" data-p="${escapeHtml(t.priority)}" title="${PRIORITY_NAME[t.priority] || ""}"><span aria-hidden="true">${PRIORITY_MARK[t.priority] || "!"}</span><span class="sr">${PRIORITY_NAME[t.priority] || ""}</span></span>
+        const all = await api("/api/tasks?include_completed=true");
+        const open = all.filter((t) => t.status !== "COMPLETED"), finished = all.filter((t) => t.status === "COMPLETED");
+        const fresh = freshIds("tasks", open);
+        $("tasks-count").textContent = `${open.length} open` + (finished.length ? `, ${finished.length} done` : "");
+        $("clear-done").hidden = !finished.length;
+        const rows = showDone ? open.concat(finished) : open;
+        $("tasks").innerHTML = rows.map((t) => {
+          const isDone = t.status === "COMPLETED";
+          return `
+          <li class="task ${isDone ? "done" : ""}" data-id="${t.id}">
+            <button class="box ${isDone ? "on" : ""}" type="button" data-act="toggle" data-id="${t.id}" aria-label="${isDone ? "Mark not done" : "Mark done"}: ${escapeHtml(t.title)}"><svg class="icon" style="width:15px;height:15px"><use href="#i-check"/></svg></button>
+            <button class="pri" type="button" data-act="pri" data-id="${t.id}" data-p="${escapeHtml(t.priority)}" title="${PRIORITY_NAME[t.priority] || ""}. Click to change." aria-label="${PRIORITY_NAME[t.priority] || ""}. Change priority"><span aria-hidden="true">${PRIORITY_MARK[t.priority] || "!"}</span></button>
             <span class="title ${fresh.has(t.id) ? "fresh" : ""}">${escapeHtml(t.title)}</span>
-          </li>`).join("") || `<li class="empty">Nothing open. Say &ldquo;add a task to call the dentist&rdquo;.</li>`;
-        document.querySelectorAll("[data-done]").forEach((b) => b.addEventListener("click", async () => {
-          try { await api(`/api/tasks/${b.dataset.done}/toggle`, { method: "POST" }); toast("Task done"); } catch (e) { toast("Could not update the task. Try again."); }
-          loadTasks();
-        }));
+            <span class="row-actions">
+              <button class="act" type="button" data-act="edit" data-id="${t.id}" aria-label="Edit ${escapeHtml(t.title)}"><span>Edit</span></button>
+              <button class="act danger" type="button" data-act="del" data-id="${t.id}" aria-label="Delete ${escapeHtml(t.title)}"><svg class="icon"><use href="#i-trash"/></svg><span>Delete</span></button>
+            </span>
+          </li>`;
+        }).join("") || `<li class="empty">${finished.length && !showDone ? "All done. Tick &ldquo;Show completed&rdquo; to see finished tasks." : "Nothing open. Add one above, or say &ldquo;add a task to call the dentist&rdquo;."}</li>`;
       } catch (e) { $("tasks").innerHTML = `<li class="empty">Could not load tasks. Check that the hub is running.</li>`; }
     }
+    $("tasks").addEventListener("click", async (e) => {
+      const b = e.target.closest("button[data-act]"); if (!b) return;
+      const act = b.dataset.act, id = b.dataset.id;
+      if (act === "toggle") {
+        const r = await mutate("POST", `/api/tasks/${id}/toggle`);
+        if (r) toast(r.status === "COMPLETED" ? "Task done" : "Task reopened");
+      } else if (act === "pri") {
+        await mutate("PATCH", `/api/tasks/${id}`, { priority: NEXT_PRI[b.dataset.p] || "MEDIUM" });
+      } else if (act === "edit") {
+        const li = b.closest(".task");
+        inlineEdit(li.querySelector(".title"), { label: "Task title", onSave: (v) => mutate("PATCH", `/api/tasks/${id}`, { title: v }, "Task updated") });
+        return;
+      } else if (act === "del") {
+        if (!armed(b, "Delete task?")) return;
+        await mutate("DELETE", `/api/tasks/${id}`, null, "Task deleted");
+      }
+      loadTasks();
+    });
+    $("task-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = $("task-title"), title = input.value.trim();
+      if (!title) return;
+      if (await mutate("POST", "/api/tasks", { title, priority: $("task-pri").value }, "Task added")) { input.value = ""; loadTasks(); }
+    });
+    $("clear-done").addEventListener("click", async (e) => {
+      if (!armed(e.currentTarget, "Clear all done?")) return;
+      const r = await mutate("DELETE", "/api/tasks/completed");
+      if (r) toast(`Cleared ${r.removed} completed task${r.removed === 1 ? "" : "s"}`);
+      loadTasks();
+    });
+
+    /* ---------- notes ---------- */
+    let notesCache = [];
+    const expandedNotes = new Set();
     function noteTime(s) {
       const d = new Date(s.replace(" ", "T") + "Z");
       if (isNaN(d)) return "";
       const days = Math.floor((Date.now() - d) / 864e5);
       return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${timeLabel(d)}`;
     }
+    let notesFresh = new Set();
+    function renderNotes() {
+      const q = $("note-search").value.trim().toLowerCase();
+      const rows = q ? notesCache.filter((n) => (n.title + " " + n.content).toLowerCase().includes(q)) : notesCache;
+      $("notes-count").textContent = q ? `${rows.length} of ${notesCache.length}` : `${notesCache.length} saved`;
+      $("notes").innerHTML = rows.map((n) => {
+        const long = n.content.length > 160 || n.content.split("\n").length > 3, open = expandedNotes.has(n.id);
+        return `
+          <li class="note ${open ? "expanded" : ""}" data-id="${n.id}">
+            <div><h3 class="${notesFresh.has(n.id) ? "fresh" : ""}">${escapeHtml(n.title)}</h3><p>${escapeHtml(n.content)}</p>
+              <span class="when">${escapeHtml(noteTime(n.created_at || ""))}</span>
+              ${long ? `<button class="act small" type="button" data-act="more" data-id="${n.id}" style="margin-left:10px"><span>${open ? "Show less" : "Show more"}</span></button>` : ""}</div>
+            <div class="actions">
+              <button class="act" type="button" data-act="play" data-id="${n.id}" aria-label="Play ${escapeHtml(n.title)} on the speaker"><svg class="icon"><use href="#i-play"/></svg>Play</button>
+              <button class="act" type="button" data-act="edit" data-id="${n.id}" aria-label="Edit ${escapeHtml(n.title)}"><span>Edit</span></button>
+              <button class="act danger" type="button" data-act="del" data-id="${n.id}" aria-label="Delete ${escapeHtml(n.title)}"><svg class="icon"><use href="#i-trash"/></svg><span>Delete</span></button>
+            </div>
+          </li>`;
+      }).join("") || `<li class="empty">${q ? "No notes match that search." : "No notes yet. Say &ldquo;note: the demo is on Friday&rdquo;, or use New note."}</li>`;
+    }
     async function loadNotes() {
       try {
-        const notes = await api("/api/notes");
-        const fresh = freshIds("notes", notes);
-        $("notes-count").textContent = `${notes.length} saved`;
-        $("notes").innerHTML = notes.map((n) => `
-          <li class="note">
-            <div><h3 class="${fresh.has(n.id) ? "fresh" : ""}">${escapeHtml(n.title)}</h3><p>${escapeHtml(n.content)}</p><span class="when">${escapeHtml(noteTime(n.created_at || ""))}</span></div>
-            <div class="actions">
-              <button class="act" type="button" data-play="${n.id}" aria-label="Play ${escapeHtml(n.title)} on the speaker"><svg class="icon"><use href="#i-play"/></svg>Play</button>
-              <button class="act danger" type="button" data-del="${n.id}" aria-label="Delete ${escapeHtml(n.title)}"><svg class="icon"><use href="#i-trash"/></svg><span>Delete</span></button>
-            </div>
-          </li>`).join("") || `<li class="empty">No notes yet. Say &ldquo;note: the demo is on Friday&rdquo;.</li>`;
-        document.querySelectorAll("[data-play]").forEach((b) => b.addEventListener("click", async () => {
-          toast("Preparing audio…");
-          try {
-            const r = await api(`/api/notes/${b.dataset.play}/play`, { method: "POST" });
-            if ($("chk-laptop-audio").checked && r.audio_url) new Audio(`${r.audio_url}?t=${Date.now()}`).play().catch(() => {});
-          } catch (e) { toast("Could not play that note. Try again."); }
-        }));
-        document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
-          if (!b.classList.contains("confirm")) {          // two-step delete: the first click arms it
-            b.classList.add("confirm"); b.querySelector("span").textContent = "Delete note?";
-            setTimeout(() => { b.classList.remove("confirm"); b.querySelector("span").textContent = "Delete"; }, 3000);
-            return;
-          }
-          try { await api(`/api/notes/${b.dataset.del}`, { method: "DELETE" }); toast("Note deleted"); } catch (e) { toast("Could not delete that note. Try again."); }
-          loadNotes();
-        }));
+        notesCache = await api("/api/notes");
+        notesFresh = freshIds("notes", notesCache);
+        renderNotes();
       } catch (e) { $("notes").innerHTML = `<li class="empty">Could not load notes. Check that the hub is running.</li>`; }
     }
-    function refreshAll() { loadHabits(); loadTasks(); loadNotes(); }
+    $("note-search").addEventListener("input", renderNotes);
+    $("new-note-btn").addEventListener("click", () => { $("note-form").hidden = !$("note-form").hidden; if (!$("note-form").hidden) $("note-content").focus(); });
+    $("note-cancel").addEventListener("click", () => { $("note-form").hidden = true; });
+    $("note-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = $("note-title").value.trim(), content = $("note-content").value.trim();
+      if (!title && !content) return;
+      if (await mutate("POST", "/api/notes", { title, content }, "Note saved")) {
+        $("note-title").value = ""; $("note-content").value = ""; $("note-form").hidden = true; loadNotes();
+      }
+    });
+    function startNoteEdit(li) {
+      const n = notesCache.find((x) => String(x.id) === li.dataset.id); if (!n) return;
+      editing = true;
+      li.innerHTML = `<div class="note-edit">
+        <input class="edit-input" type="text" maxlength="80" value="${escapeHtml(n.title)}" aria-label="Note title" />
+        <textarea class="edit-input" rows="4" aria-label="Note text">${escapeHtml(n.content)}</textarea>
+        <div class="tools"><button class="btn-ghost btn-primary" type="button" data-save>Save</button><button class="btn-ghost" type="button" data-cancel>Cancel</button></div></div>`;
+      const [title, content] = [li.querySelector("input"), li.querySelector("textarea")];
+      title.focus();
+      const finish = async (save) => {
+        editing = false;
+        if (save) await mutate("PATCH", `/api/notes/${n.id}`, { title: title.value, content: content.value }, "Note updated");
+        refreshAll(true);
+      };
+      li.querySelector("[data-save]").addEventListener("click", () => finish(true));
+      li.querySelector("[data-cancel]").addEventListener("click", () => finish(false));
+      li.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(false); } });
+    }
+    $("notes").addEventListener("click", async (e) => {
+      const b = e.target.closest("button[data-act]"); if (!b) return;
+      const act = b.dataset.act, id = Number(b.dataset.id);
+      if (act === "more") { expandedNotes.has(id) ? expandedNotes.delete(id) : expandedNotes.add(id); renderNotes(); }
+      else if (act === "edit") startNoteEdit(b.closest(".note"));
+      else if (act === "play") {
+        toast("Preparing audio…");
+        const r = await mutate("POST", `/api/notes/${id}/play`);
+        if (r && $("chk-laptop-audio").checked && r.audio_url) new Audio(`${r.audio_url}?t=${Date.now()}`).play().catch(() => {});
+      } else if (act === "del") {
+        if (!armed(b, "Delete note?")) return;
+        if (await mutate("DELETE", `/api/notes/${id}`, null, "Note deleted")) loadNotes();
+      }
+    });
+    function refreshAll(force) {
+      if (editing && !force) { dirty = true; return; }
+      dirty = false; loadHabits(); loadTasks(); loadNotes();
+    }
 
     /* ---------- start ---------- */
     initTheme(); fitScreen(); drawFrame(null);

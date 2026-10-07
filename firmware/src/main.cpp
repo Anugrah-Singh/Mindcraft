@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <vector>
 
 #include "config.h"
 #include "display.h"

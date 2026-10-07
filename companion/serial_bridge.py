@@ -143,13 +143,38 @@ class Bridge:
             self.end_ack.clear()
             self.ser.write(b"\x00\x00")
 
+    def reopen_serial(self):
+        """The USB port dropped (cable, brown-out, board reset): wait for it and open it again."""
+        self.hub_send({"type": "device_info", "usb": False})
+        self.cancel_play.set()
+        with self.tx_lock:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+        log("[bridge] Waiting for the ESP32 to come back...")
+        while True:
+            time.sleep(2)
+            try:
+                with self.tx_lock:
+                    self.ser.open()
+                break
+            except (serial.SerialException, OSError):
+                continue
+        self.streaming = False
+        self.end_ack.set()
+        self.bt_state = None
+        self.hub_send({"type": "device_info", "usb": True})
+        log(f"[bridge] Reconnected to {self.ser.port}")
+
     def reader(self):
         while True:
             try:
                 line = self.ser.readline()
-            except serial.SerialException as e:
+            except (serial.SerialException, OSError) as e:
                 log(f"[bridge] serial error: {e}")
-                return
+                self.reopen_serial()
+                continue
             if not line:
                 continue
             if line.startswith(b"@A"):

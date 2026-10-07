@@ -1,54 +1,77 @@
-# Mindcraft: Smart Voice & Productivity Assistant
+# Mindcraft
 
-Mindcraft is an ambient AI assistant combining an **ESP32 microcontroller**, **monochrome OLED display**, **I2S Microphone (INMP441)**, and **I2S Amplifier (MAX98357A)** with a high-speed **Laptop Companion Hub** powered by the **Google Gemini API**.
+A voice notebook. Say "add a task to call the dentist" or "I went to the gym" to an ESP32 recorder; Gemini works
+out what you meant, files it as a task, note or habit streak, and answers out loud on a Bluetooth speaker.
 
----
+![Dashboard](docs/images/dashboard-light.png)
 
-## 🚀 Features
+## What it is
 
-* **Voice Notes App**: Fast capture of spontaneous thoughts, memos, and ideas.
-* **Prioritized Tasks App**: Natural language task capture automatically ranked as High, Medium, or Low priority.
-* **Habit Streaks Tracker**: Daily streak counters (Gym 🔥, reading, hydration) updated by voice.
-* **Conversational AI**: High-speed conversational responses via Gemini 2.5 Flash with synthesized audio streaming through the speaker.
-* **Laptop Virtual Controller**: Web dashboard providing virtual buttons (Up, Down, Select, Back, Push-to-Talk) and real-time OLED screen mirroring.
+- **ESP32** with a 128x64 OLED, an INMP441 microphone and optional push buttons. It starts recording when you
+  speak and stops when you stop.
+- **Bluetooth speaker** (boAt Stone 190) plays the replies.
+- **Companion hub** on your PC (FastAPI + Gemini + text-to-speech) keeps the tasks, habits and notes.
+- **USB bridge** carries everything between the PC and the ESP32. The ESP32 never uses Wi-Fi, because Wi-Fi and
+  Bluetooth share one radio and Wi-Fi traffic made the speaker stutter.
+- **Dashboard** at http://localhost:8000 with a live copy of the OLED, the device buttons, and your notebook.
 
----
+```
+INMP441 --I2S--> ESP32 --USB (921600 baud)--> serial_bridge.py --> Companion hub --> Gemini
+OLED <--I2C----- ESP32 <--USB----------------  serial_bridge.py <-- Companion hub <-- text-to-speech
+                 ESP32 --Bluetooth--> Stone 190 speaker
+```
 
-## 🔌 Hardware Connections (Breadboard)
+## Hardware
 
-| Peripheral | Peripheral Pin | Default ESP32 Pin | Description |
-| :--- | :--- | :--- | :--- |
-| **OLED (SSD1306)** | `SDA` | **GPIO 21** | I2C Data |
-| | `SCL` | **GPIO 22** | I2C Clock |
-| | `VCC` | **3V3** | Power (3.3V) |
-| | `GND` | **GND** | Ground |
-| **Mic (INMP441)** | `SCK` (BCLK) | **GPIO 14** | Serial Clock |
-| | `WS` (LRCK) | **GPIO 15** | Word Select |
-| | `SD` (DOUT) | **GPIO 32** | Serial Data |
-| | `L/R` | **GND** | Left channel select |
-| | `VDD` | **3V3** | Power (3.3V) |
-| | `GND` | **GND** | Ground |
-| **Amp (MAX98357A)** | `BCLK` | **GPIO 26** | Bit Clock |
-| | `LRC` | **GPIO 25** | Left/Right Clock |
-| | `DIN` | **GPIO 27** | Data Input |
-| | `VIN` | **5V / VIN** | Power (5V recommended) |
-| | `GND` | **GND** | Ground |
+| Part | Pin | ESP32 |
+| :--- | :--- | :--- |
+| OLED SSD1306 (I2C 0x3C) | SDA / SCL | GPIO 21 / GPIO 22 |
+| INMP441 microphone | SCK / WS / SD | GPIO 26 / GPIO 25 / GPIO 32 |
+| | L/R, VDD, GND | GND, 3V3, GND |
+| Buttons (optional, to GND) | Up / Down / Select / Back | GPIO 27 / 14 / 13 / 4 |
 
-*(Pins can be customized in [`firmware/src/config.h`](file:///C:/Users/poppi/OneDrive/Desktop/wincode/Mindcraft/firmware/src/config.h))*
+The speaker connects over Bluetooth, so it needs no wiring. Its Bluetooth name must be `Stone 190`. Pins and
+the volume are set in [`firmware/src/config.h`](firmware/src/config.h).
 
----
+## Set up and run
 
-## 💻 Running the Companion Server
-
-1. **Set your Google Gemini API Key**:
-   Create a `.env` file in the `companion/` folder:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-
-2. **Start the Hub**:
+1. **Hub.** In `companion/`, create `.env` with `GEMINI_API_KEY=your_key`, then:
    ```powershell
-   companion\.venv\Scripts\python.exe companion\app.py
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+   python -m uvicorn app:app --host 127.0.0.1 --port 8000
    ```
+2. **Firmware.** In `firmware/` (needs PlatformIO), with the ESP32 on USB:
+   ```powershell
+   pio run -t upload --upload-port COM3
+   ```
+3. **Bridge.** In `companion/`, in a second window (only one program can use the COM port, so close it before
+   flashing):
+   ```powershell
+   python serial_bridge.py --port COM3
+   ```
+4. Open http://localhost:8000. The three lights at the top (Hub, USB device, Stone 190 speaker) should be green.
 
-3. Open `http://localhost:8000` in your browser to access the **Virtual Hardware Controller** and dashboard.
+If the dashboard says **No signal**, the bridge is not running or the ESP32 is not plugged in.
+
+## Using it
+
+Press **Record** (or Space, or the Select button on the "Ask AI" tile) and speak. Examples: "add a high priority
+task to send the invoice", "I finished the invoice task", "note: ask the supplier about the power adapter",
+"I read for twenty minutes", or any question. You can also type the request on the dashboard.
+
+Keys: Space record, W/S or arrows move, Enter select, Esc back.
+
+## Project layout
+
+| Path | What is in it |
+| :--- | :--- |
+| `firmware/src/` | ESP32 code: `main.cpp` (USB protocol, buttons), `display.cpp` (OLED screens), `audio_mic.cpp` (voice capture), `audio_speaker.cpp` (Bluetooth playback) |
+| `companion/app.py` | Hub: web server, websockets, screen state machine |
+| `companion/screens.py` | The screens shown on the OLED and mirrored on the dashboard |
+| `companion/storage.py` | SQLite tasks, notes and habit streaks |
+| `companion/gemini_service.py`, `tts_service.py` | Gemini requests and text-to-speech |
+| `companion/serial_bridge.py` | USB link between the PC and the ESP32 |
+| `companion/web/index.html` | Dashboard |
+| `docs/` | [Handoff notes](docs/mindcraft_handoff.md) (protocol, design decisions, limitations) and screenshots |

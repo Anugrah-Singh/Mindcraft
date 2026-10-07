@@ -35,13 +35,10 @@
 // --- Bluetooth Audio Speaker (boAt Stone 190) ---
 #define BT_SPEAKER_NAME "Stone 190"
 #define BT_AUDIO_RATE   44100
-#define BT_AUDIO_CH     2
-#define DEFAULT_BT_VOLUME 110
-#define MAX_BT_VOLUME     110
+#define DEFAULT_BT_VOLUME 110   // 0-127. The Stone 190 can shut itself off at very high volume; back off to ~100 if it does
 
 // ==========================================
 // 3. Audio & Recording Settings
 // ==========================================
 #define SAMPLE_RATE     44100   // I2S capture rate
 #define MIC_OUT_RATE    22050   // rate of audio sent to the laptop (SAMPLE_RATE / 2)
-#define RECORD_SECONDS  3

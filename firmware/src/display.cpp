@@ -425,17 +425,6 @@ void MindcraftDisplay::showScreen(JsonObjectConst screen) {
     redraw();
 }
 
-void MindcraftDisplay::updateScreen(const String& title, const std::vector<String>& lines,
-                                    const String& footer_left, const String& footer_right) {
-    JsonDocument doc;
-    doc["title"] = title;
-    JsonArray arr = doc["lines"].to<JsonArray>();
-    for (const String& l : lines) arr.add(l);
-    doc["footer_left"] = footer_left;
-    doc["footer_right"] = footer_right;
-    showScreen(doc.as<JsonObjectConst>());
-}
-
 void MindcraftDisplay::showWaiting() {
     haveScreen = false;
     redraw();
@@ -486,12 +475,6 @@ void MindcraftDisplay::setBtConnected(bool connected) {
     if (connected == btUp) return;
     btUp = connected;
     redraw();
-}
-
-void MindcraftDisplay::setHubLinked(bool linked) {
-    if (linked == hubUp) return;
-    hubUp = linked;
-    if (!haveScreen) redraw();
 }
 
 void MindcraftDisplay::tick() {

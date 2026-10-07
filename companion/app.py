@@ -1,15 +1,11 @@
 import os
 import io
-import re
 import json
 import asyncio
-import textwrap
-import unicodedata
-import html as html_lib
-from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, FileResponse, Response
-from fastapi.staticfiles import StaticFiles
+from datetime import datetime
+from typing import List, Optional
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pathlib import Path
@@ -177,7 +173,7 @@ class ConnectionManager:
         await self.to_browsers({"type": "ai_result", "result": result})
 
     async def broadcast_device_info(self):
-        info = dict(device_info, link=bool(self.esp32_sockets))
+        info = dict(device_info, link=bool(self.esp32_sockets) and device_info.get("usb", True))
         await self.to_browsers({"type": "device_info", "info": info})
 
     async def notify_play_audio(self):
@@ -198,11 +194,6 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
-
-# Backwards-compatible names used by tests and older code
-ascii_text = screens.ascii_text
-OLED_COLS = screens.OLED_COLS
-oled_payload = screens.oled_payload
 
 
 def render_screen_state() -> dict:
@@ -301,42 +292,156 @@ async def serve_index():
     index_file = WEB_DIR / "index.html"
     return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
 
-@app.get("/api/tasks")
-async def get_tasks():
-    return storage.get_tasks()
-
-@app.post("/api/tasks/{task_id}/toggle")
-async def toggle_task(task_id: int):
-    result = storage.toggle_task(task_id)
+async def _data_changed():
+    """Tell every dashboard to reload and redraw the device screen."""
     await manager.broadcast_refresh()
     await show_screen(render_screen_state())
-    return result
 
-@app.get("/api/habits")
-async def get_habits():
-    return storage.get_habits()
+
+class TaskIn(BaseModel):
+    title: str
+    priority: str = "MEDIUM"
+
+class TaskPatch(BaseModel):
+    title: Optional[str] = None
+    priority: Optional[str] = None
+
+class NoteIn(BaseModel):
+    title: Optional[str] = None
+    content: str
+
+class NotePatch(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+class HabitIn(BaseModel):
+    name: str
 
 class HabitLog(BaseModel):
     name: str
 
+
+# ---- tasks
+@app.get("/api/tasks")
+async def get_tasks(include_completed: bool = False):
+    return storage.get_all_tasks() if include_completed else storage.get_tasks()
+
+@app.post("/api/tasks")
+async def create_task(req: TaskIn):
+    if not req.title.strip():
+        return JSONResponse({"detail": "Title is required"}, status_code=422)
+    task = storage.add_task(req.title, req.priority)
+    await _data_changed()
+    return task
+
+@app.delete("/api/tasks/completed")
+async def clear_completed_tasks():
+    removed = storage.clear_completed_tasks()
+    await _data_changed()
+    return {"removed": removed}
+
+@app.post("/api/tasks/{task_id}/toggle")
+async def toggle_task(task_id: int):
+    result = storage.toggle_task(task_id)
+    await _data_changed()
+    return result
+
+@app.patch("/api/tasks/{task_id}")
+async def patch_task(task_id: int, req: TaskPatch):
+    result = storage.update_task(task_id, req.title, req.priority)
+    if not result:
+        return Response(status_code=404)
+    await _data_changed()
+    return result
+
+@app.delete("/api/tasks/{task_id}")
+async def remove_task(task_id: int):
+    if not storage.delete_task(task_id):
+        return Response(status_code=404)
+    await _data_changed()
+    return {"status": "deleted"}
+
+
+# ---- habits
+@app.get("/api/habits")
+async def get_habits():
+    return storage.get_habits()
+
+@app.post("/api/habits")
+async def create_habit(req: HabitIn):
+    if not req.name.strip():
+        return JSONResponse({"detail": "Name is required"}, status_code=422)
+    habit = storage.add_habit(req.name)
+    if not habit:
+        return JSONResponse({"detail": "You already track that habit"}, status_code=409)
+    await _data_changed()
+    return habit
+
 @app.post("/api/habits/log")
 async def log_habit(req: HabitLog):
     result = storage.record_habit(req.name)
-    await manager.broadcast_refresh()
-    await show_screen(render_screen_state())
+    await _data_changed()
     return result
 
+@app.post("/api/habits/unlog")
+async def unlog_habit(req: HabitLog):
+    result = storage.unlog_habit(req.name)
+    if not result:
+        return Response(status_code=404)
+    await _data_changed()
+    return result
+
+@app.patch("/api/habits/{habit_id}")
+async def patch_habit(habit_id: int, req: HabitIn):
+    result = storage.rename_habit(habit_id, req.name)
+    if not result:
+        return JSONResponse({"detail": "Could not rename (empty or already used)"}, status_code=409)
+    await _data_changed()
+    return result
+
+@app.delete("/api/habits/{habit_id}")
+async def remove_habit(habit_id: int):
+    if not storage.delete_habit(habit_id):
+        return Response(status_code=404)
+    await _data_changed()
+    return {"status": "deleted"}
+
+
+# ---- notes
 @app.get("/api/notes")
-async def get_notes():
-    return storage.get_notes()
+async def get_notes(limit: int = 500):
+    return storage.get_notes(limit=max(1, min(limit, 2000)))
+
+@app.post("/api/notes")
+async def create_note(req: NoteIn):
+    if not req.content.strip() and not (req.title or "").strip():
+        return JSONResponse({"detail": "A note needs some text"}, status_code=422)
+    note = storage.add_note(req.title, req.content)
+    await _data_changed()
+    return note
+
+@app.patch("/api/notes/{note_id}")
+async def patch_note(note_id: int, req: NotePatch):
+    result = storage.update_note(note_id, req.title, req.content)
+    if not result:
+        return Response(status_code=404)
+    await _data_changed()
+    return result
 
 @app.delete("/api/notes/{note_id}")
 async def delete_note(note_id: int):
     if not storage.delete_note(note_id):
         return Response(status_code=404)
-    await manager.broadcast_refresh()
-    await show_screen(render_screen_state())
+    await _data_changed()
     return {"status": "deleted"}
+
+
+# ---- backup
+@app.get("/api/export")
+async def export_data():
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    return JSONResponse(storage.export_all(),
+                        headers={"Content-Disposition": f'attachment; filename="mindcraft-{stamp}.json"'})
 
 @app.get("/api/last_ai")
 async def get_last_ai():
@@ -344,10 +449,10 @@ async def get_last_ai():
 
 @app.get("/api/device")
 async def get_device():
-    return dict(device_info, link=bool(manager.esp32_sockets))
+    return dict(device_info, link=bool(manager.esp32_sockets) and device_info.get("usb", True))
 
 async def play_note_audio(note_id: int):
-    notes = storage.get_notes(limit=50)
+    notes = storage.get_notes()
     target = next((n for n in notes if n["id"] == note_id), None)
     if not target:
         return False
@@ -365,7 +470,7 @@ async def play_note_audio(note_id: int):
 
 @app.post("/api/notes/{note_id}/play")
 async def api_play_note(note_id: int):
-    notes = storage.get_notes(limit=50)
+    notes = storage.get_notes()
     target = next((n for n in notes if n["id"] == note_id), None)
     if target:
         await show_screen(screens.status_screen("preparing", target["title"], "Preparing audio", "PLAYING"))
@@ -425,18 +530,9 @@ async def _show_error(head: str, sub: str, spoken: str, oled: str):
 async def process_audio(request: Request):
     content_type = request.headers.get("content-type", "")
     try:
-        if "multipart/form-data" in content_type:
-            form = await request.form()
-            file = form.get("file")
-            if file and hasattr(file, "read"):
-                audio_bytes = await file.read()
-                raw_mime = getattr(file, "content_type", "audio/webm") or "audio/webm"
-            else:
-                return {"error": "No file uploaded"}
-        else:
-            # Raw bytes from the USB bridge
-            audio_bytes = await request.body()
-            raw_mime = content_type or "audio/wav"
+        # Raw WAV bytes from the USB bridge
+        audio_bytes = await request.body()
+        raw_mime = content_type or "audio/wav"
     except Exception as e:
         print(f"[Audio In] Upload stream ended prematurely: {e}")
         await _show_error("Upload interrupted", "Try again", "Audio upload was interrupted. Please try again.", "Upload Error")
@@ -493,6 +589,7 @@ async def handle_ai_action(result: dict):
     action = str(result.get("action") or "CONVERSATION").upper()
     spoken = str(result.get("spoken_response") or "")
     oled_text = str(result.get("oled_text") or "Processed")
+    play_note_id = None
 
     # Apply the action and make the spoken reply reflect what really happened.
     try:
@@ -524,6 +621,43 @@ async def handle_ai_action(result: dict):
             else:
                 spoken = "I could not find a matching pending task."
                 oled_text = "Task Not Found"
+        elif action == "DELETE_NOTE":
+            note = storage.find_note_by_title(result.get("title"))
+            if note and storage.delete_note(note["id"]):
+                spoken = f"Deleted note: {note['title']}."
+                oled_text = "Note Deleted"
+            else:
+                spoken = "I could not find a note with that name."
+                oled_text = "Note Not Found"
+        elif action == "DELETE_TASK":
+            task = storage.find_task_by_title(result.get("title"), include_completed=True)
+            if task and storage.delete_task(task["id"]):
+                spoken = f"Deleted task: {task['title']}."
+                oled_text = "Task Deleted"
+            else:
+                spoken = "I could not find a task with that name."
+                oled_text = "Task Not Found"
+        elif action == "LIST_TASKS":
+            open_tasks = storage.get_tasks()
+            if not open_tasks:
+                spoken = "You have no open tasks."
+                oled_text = "No open tasks"
+            else:
+                names = [t["title"] for t in open_tasks[:5]]
+                more = len(open_tasks) - len(names)
+                count = len(open_tasks)
+                spoken = (f"You have {count} open task{'s' if count != 1 else ''}: " + "; ".join(names) + "."
+                          + (f" And {more} more." if more > 0 else ""))
+                oled_text = f"{count} open task{'s' if count != 1 else ''}"
+        elif action == "PLAY_NOTE":
+            note = storage.find_note_by_title(result.get("title"))
+            if note:
+                play_note_id = note["id"]
+                spoken = ""                   # the note itself is the audio reply
+                oled_text = note["title"]
+            else:
+                spoken = "I could not find a note with that name."
+                oled_text = "Note Not Found"
     except Exception as storage_err:
         print(f"[Storage Error in handle_ai_action] {storage_err}")
         spoken = "Sorry, I heard you but could not save that. Please try again."
@@ -547,8 +681,10 @@ async def handle_ai_action(result: dict):
         except Exception as br_err:
             print(f"[Broadcast AI Result Error] {br_err}")
 
-    # 2. Synthesize speech and tell the device to play it on the Bluetooth speaker
-    if spoken:
+    # 2. Play a saved note, or synthesize the spoken reply, on the Bluetooth speaker
+    if play_note_id is not None:
+        await play_note_audio(play_note_id)
+    elif spoken:
         try:
             audio_bytes = await tts_service.text_to_speech_mp3(spoken)
             await asyncio.to_thread(save_mp3_safely, audio_bytes)
@@ -583,7 +719,7 @@ async def controller_ws(websocket: WebSocket):
     await manager.connect_browser(websocket)
     try:
         await websocket.send_text(json.dumps({"type": "screen_update", "screen": render_screen_state()}))
-        await websocket.send_text(json.dumps({"type": "device_info", "info": dict(device_info, link=bool(manager.esp32_sockets))}))
+        await websocket.send_text(json.dumps({"type": "device_info", "info": dict(device_info, link=bool(manager.esp32_sockets) and device_info.get("usb", True))}))
         if last_frame:
             await websocket.send_text(json.dumps({"type": "device_frame", "hex": last_frame}))
         while True:
@@ -629,9 +765,13 @@ async def esp32_ws(websocket: WebSocket):
                 elif kind == "device_state":      # recording started / finished, reported by the bridge
                     await manager.to_browsers({"type": "device_state", "state": msg.get("state", "")})
                 elif kind == "device_info":       # e.g. {"bt": true}
+                    if "usb" in msg:             # the bridge lost / regained the serial port
+                        device_info["usb"] = bool(msg["usb"])
+                        if not device_info["usb"]:
+                            device_info["bt"] = False
                     if "bt" in msg:
                         device_info["bt"] = bool(msg["bt"])
-                        await manager.broadcast_device_info()
+                    await manager.broadcast_device_info()
             except Exception as e:
                 print(f"[ESP32 WS] message error: {e}")
     except Exception as e:
@@ -640,6 +780,7 @@ async def esp32_ws(websocket: WebSocket):
         manager.disconnect_esp32(websocket)
         if not manager.esp32_sockets:
             device_info["bt"] = False
+            device_info["usb"] = True
         await manager.broadcast_device_info()
 
 if __name__ == "__main__":

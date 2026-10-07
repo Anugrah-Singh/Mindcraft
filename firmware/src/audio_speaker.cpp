@@ -230,14 +230,6 @@ bool AudioSpeaker::isConnected() {
     return btConnected || a2dp_source.is_connected();
 }
 
-bool AudioSpeaker::isAudioStarted() {
-    return btAudioStarted;
-}
-
-bool AudioSpeaker::isPlaying() {
-    return clipActive || (samplesAvailable() > 0);
-}
-
 String AudioSpeaker::getStatusString() {
     return isConnected() ? "BT: Connected" : "BT: Connecting...";
 }
